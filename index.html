@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RunCast — Run to the beat</title>
+<meta name="description" content="Generate the perfect running playlist matched to your pace, cadence and energy — powered by Spotify." />
+<meta name="theme-color" content="#0a0a0a" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --green: #1DB954;
+  --green-dim: #17a349;
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --surface2: #1e1e1e;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f0;
+  --muted: #888;
+  --muted2: #555;
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --mood-warmup: #f59e0b;
+  --mood-steady: #1DB954;
+  --mood-push: #f97316;
+  --mood-peak: #ef4444;
+  --mood-cooldown: #60a5fa;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--muted2); border-radius: 2px; }
+
+/* INPUTS */
+input, select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 9px 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, select:focus { border-color: var(--green); }
+input[type=number] { -moz-appearance: textfield; }
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+select option { background: var(--surface2); }
+label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* BUTTONS */
+.btn {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: var(--radius);
+  padding: 14px 28px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+}
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--green); color: #000; }
+.btn-primary:hover { background: #22d461; }
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border2);
+  font-size: 14px;
+  padding: 10px 20px;
+  width: auto;
+}
+.btn-ghost:hover { border-color: var(--green); color: var(--green); }
+.btn-spotify { background: var(--green); color: #000; }
+
+/* SCREENS */
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ─── SPLASH ─── */
+#screen-splash {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.splash-bg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(29,185,84,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.splash-logo {
+  font-family: var(--font-display);
+  font-size: clamp(72px, 18vw, 120px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+  color: var(--text);
+}
+.splash-logo span { color: var(--green); }
+.splash-tag {
+  font-size: 14px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 1rem 0 2.5rem;
+}
+.splash-actions { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+.spotify-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 0.5rem;
+}
+.spotify-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+
+/* ─── INNER SCREENS ─── */
+.inner-screen { max-width: 480px; margin: 0 auto; width: 100%; padding: 1.5rem 1rem 6rem; }
+
+/* TOPBAR */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1rem 1rem 0;
+  max-width: 480px;
+  margin: 0 auto;
+  width: 100%;
+}
+.topbar-logo { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text); flex: 1; }
+.topbar-logo span { color: var(--green); }
+.topbar-user { font-size: 12px; color: var(--muted); text-align: right; line-height: 1.3; }
+.topbar-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 500; color: var(--green);
+  flex-shrink: 0;
+}
+
+/* STEP INDICATOR */
+.steps-wrap { padding: 1rem 1rem 0; max-width: 480px; margin: 0 auto; width: 100%; }
+.steps-bar { display: flex; gap: 4px; }
+.step-pip { flex: 1; height: 3px; border-radius: 2px; background: var(--surface2); transition: background 0.3s; }
+.step-pip.active { background: var(--green); }
+.step-text { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 6px; }
+
+/* SECTION TITLES */
+.section-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  margin-bottom: 0.25rem;
+}
+.section-sub { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.5; }
+
+/* CARDS */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+/* GENRE GRID */
+.genre-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.genre-pill {
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+.genre-pill:hover { border-color: var(--green); color: var(--text); }
+.genre-pill.on { background: var(--green); border-color: var(--green); color: #000; font-weight: 600; }
+
+/* SEGMENT ROWS */
+.seg-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 1fr 28px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.seg-index {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600;
+  color: var(--green);
+  flex-shrink: 0;
+}
+.seg-col-head {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  text-align: center;
+}
+.seg-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted2); font-size: 16px; line-height: 1;
+  transition: color 0.15s;
+}
+.seg-del:hover { color: #ef4444; }
+.pace-wrap { display: flex; align-items: center; gap: 4px; }
+.pace-sep { color: var(--muted); font-size: 14px; flex-shrink: 0; }
+.add-seg {
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 9px;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+}
+.add-seg:hover { border-color: var(--green); color: var(--green); }
+
+/* MOOD SELECT COLORS */
+select.mood-warmup { border-left: 3px solid var(--mood-warmup); }
+select.mood-steady { border-left: 3px solid var(--mood-steady); }
+select.mood-push { border-left: 3px solid var(--mood-push); }
+select.mood-peak { border-left: 3px solid var(--mood-peak); }
+select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
+
+/* ─── RESULTS ─── */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 1.25rem; }
+.stat-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  text-align: center;
+}
+.stat-val { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: var(--green); line-height: 1; }
+.stat-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 3px; }
+
+.result-seg { margin-bottom: 12px; }
+.result-seg-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.result-seg-header:only-child { border-radius: var(--radius); }
+.rseg-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 700;
+  flex-shrink: 0;
+}
+.rseg-bpm { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1; }
+.rseg-bpm-unit { font-size: 11px; color: var(--muted); margin-left: 2px; }
+.rseg-info { flex: 1; }
+.rseg-pace { font-size: 12px; color: var(--muted); }
+.rseg-mood-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.badge-warmup { background: rgba(245,158,11,0.15); color: var(--mood-warmup); }
+.badge-steady { background: rgba(29,185,84,0.15); color: var(--mood-steady); }
+.badge-push { background: rgba(249,115,22,0.15); color: var(--mood-push); }
+.badge-peak { background: rgba(239,68,68,0.15); color: var(--mood-peak); }
+.badge-cooldown { background: rgba(96,165,250,0.15); color: var(--mood-cooldown); }
+
+.result-seg-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+}
+.result-seg-body.collapsed { display: none; }
+
+.loading-bar {
+  height: 3px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+.loading-bar-fill {
+  height: 100%;
+  background: var(--green);
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.track-row:last-child { border-bottom: none; }
+.track-row:hover { background: var(--surface2); }
+.track-img {
+  width: 40px; height: 40px;
+  border-radius: 6px;
+  background: var(--surface2);
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.track-img-placeholder {
+  width: 40px; height: 40px;
+  border-radius: 6px;
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.track-info { flex: 1; min-width: 0; }
+.track-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-artist { font-size: 11px; color: var(--muted); }
+.track-bpm-badge {
+  font-size: 10px; font-weight: 600;
+  padding: 3px 7px; border-radius: 999px;
+  background: rgba(29,185,84,0.12);
+  color: var(--green);
+  flex-shrink: 0;
+}
+.track-open {
+  color: var(--muted2);
+  text-decoration: none;
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.track-open:hover { color: var(--green); }
+
+.seg-loading {
+  padding: 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.seg-error {
+  padding: 16px;
+  text-align: center;
+  color: #f87171;
+  font-size: 13px;
+}
+
+/* SAVE PLAYLIST SECTION */
+.save-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+.save-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.save-sub { font-size: 12px; color: var(--muted); margin-bottom: 1rem; }
+.save-status { font-size: 13px; color: var(--green); margin-top: 8px; min-height: 20px; text-align: center; }
+
+/* BOTTOM NAV AREA */
+.bottom-spacer { height: 80px; }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  font-size: 13px;
+  color: var(--text);
+  transition: transform 0.3s ease;
+  z-index: 999;
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* RESPONSIVE */
+@media (max-width: 400px) {
+  .genre-grid { grid-template-columns: repeat(3, 1fr); }
+  .seg-row { grid-template-columns: 22px 1fr 1fr 1fr 22px; gap: 5px; }
+}
+
+/* ANIMATIONS */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fadein { animation: fadeInUp 0.35s ease both; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  display: inline-block;
+  width: 16px; height: 16px;
+  border: 2px solid var(--surface2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════
+     SPLASH / HOME
+════════════════════════════════ -->
+<div class="screen active" id="screen-splash">
+  <div class="splash-bg"></div>
+  <div class="fadein">
+    <div class="splash-logo">Run<span>Cast</span></div>
+    <p class="splash-tag">Run to the beat</p>
+    <div class="splash-actions">
+      <button class="btn btn-spotify" id="btn-connect-spotify" onclick="connectSpotify()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg>
+        Connect with Spotify
+      </button>
+      <div class="spotify-badge">
+        <div class="spotify-dot"></div>
+        Powered by Spotify · Free &amp; Premium
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN: PROFILE
+════════════════════════════════ -->
+<div class="screen" id="screen-profile">
+  <div class="topbar">
+    <div class="topbar-logo">Run<span>Cast</span></div>
+    <div class="topbar-user" id="user-display"></div>
+    <div class="topbar-avatar" id="user-avatar">?</div>
+  </div>
+  <div class="steps-wrap">
+    <div class="steps-bar">
+      <div class="step-pip active"></div>
+      <div class="step-pip"></div>
+      <div class="step-pip"></div>
+    </div>
+    <div class="step-text">Step 1 of 3 — Your profile</div>
+  </div>
+  <div class="inner-screen fadein">
+    <div class="section-title">Your profile</div>
+    <p class="section-sub">We use your height to calculate your natural running cadence.</p>
+
+    <div class="card">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+        <div>
+          <label>Height (cm)</label>
+          <input type="number" id="height" value="175" min="140" max="220" />
+        </div>
+        <div>
+          <label>Distance unit</label>
+          <select id="dist-unit">
+            <option value="km">Kilometres</option>
+            <option value="mi">Miles</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label>Favorite genres <span style="color:var(--muted2); text-transform:none; letter-spacing:0; font-size:10px;">(pick up to 4)</span></label>
+        <div class="genre-grid" id="genre-grid"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="goToWorkout()">
+      Next — Build your workout
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN: WORKOUT
+════════════════════════════════ -->
+<div class="screen" id="screen-workout">
+  <div class="topbar">
+    <button class="btn-ghost" onclick="goTo('profile')" style="padding:6px 12px; font-size:12px; gap:4px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Back
+    </button>
+    <div class="topbar-logo" style="text-align:right;">Run<span>Cast</span></div>
+  </div>
+  <div class="steps-wrap">
+    <div class="steps-bar">
+      <div class="step-pip active"></div>
+      <div class="step-pip active"></div>
+      <div class="step-pip"></div>
+    </div>
+    <div class="step-text">Step 2 of 3 — Your workout</div>
+  </div>
+  <div class="inner-screen fadein">
+    <div class="section-title">Your workout</div>
+    <p class="section-sub">One row per km. Set your pace and choose an energy mood for each segment.</p>
+    <div class="card">
+      <div style="display:grid; grid-template-columns:28px 1fr 1fr 1fr 28px; gap:8px; margin-bottom:8px; align-items:center;">
+        <div></div>
+        <div class="seg-col-head">Pace</div>
+        <div class="seg-col-head">Dist</div>
+        <div class="seg-col-head">Energy</div>
+        <div></div>
+      </div>
+      <div id="seg-container"></div>
+      <button class="add-seg" onclick="addSeg()">+ Add segment</button>
+    </div>
+    <button class="btn btn-primary" onclick="goToResults()">
+      Generate playlist
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2zm12-2c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN: RESULTS
+════════════════════════════════ -->
+<div class="screen" id="screen-results">
+  <div class="topbar">
+    <button class="btn-ghost" onclick="goTo('workout')" style="padding:6px 12px; font-size:12px; gap:4px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      Edit
+    </button>
+    <div class="topbar-logo" style="text-align:right;">Run<span>Cast</span></div>
+  </div>
+  <div class="steps-wrap">
+    <div class="steps-bar">
+      <div class="step-pip active"></div>
+      <div class="step-pip active"></div>
+      <div class="step-pip active"></div>
+    </div>
+    <div class="step-text">Step 3 of 3 — Your playlist</div>
+  </div>
+  <div class="inner-screen fadein">
+    <div class="section-title">Your RunCast</div>
+    <p class="section-sub" id="results-sub">Matched to your cadence and energy.</p>
+    <div class="stats-row" id="stats-row"></div>
+    <div id="results-container"></div>
+    <div class="save-section">
+      <div class="save-title">Save to Spotify</div>
+      <div class="save-sub">Creates a playlist in your Spotify account you can play on any device.</div>
+      <button class="btn btn-primary" onclick="savePlaylist()" id="btn-save">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg>
+        Save playlist to Spotify
+      </button>
+      <div class="save-status" id="save-status"></div>
+    </div>
+    <div class="bottom-spacer"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const CLIENT_ID = '4df3cbe30b1146c9a64dea80b868d0b2';
+const REDIRECT_URI = 'https://ioanral-ux.github.io/runcast/';
+const SCOPES = 'playlist-modify-public playlist-modify-private user-read-private user-read-email';
+const GENRES_LIST = ['Rock','Pop','Hip-Hop','Electronic','R&B','Indie','Metal','Jazz','Classical','Latin','Reggae','Country','Funk','Punk'];
+const MOOD_LABELS = { warmup:'Warmup', steady:'Steady', push:'Push', peak:'Peak 🔥', cooldown:'Cooldown' };
+const MOOD_COLOR = { warmup:'var(--mood-warmup)', steady:'var(--mood-steady)', push:'var(--mood-push)', peak:'var(--mood-peak)', cooldown:'var(--mood-cooldown)' };
+const GENRE_SEEDS = {
+  'Rock': 'rock', 'Pop': 'pop', 'Hip-Hop': 'hip-hop', 'Electronic': 'electronic',
+  'R&B': 'r-n-b', 'Indie': 'indie', 'Metal': 'metal', 'Jazz': 'jazz',
+  'Classical': 'classical', 'Latin': 'latin', 'Reggae': 'reggae',
+  'Country': 'country', 'Funk': 'funk', 'Punk': 'punk'
+};
+const ENERGY_MAP = { warmup: 0.4, steady: 0.6, push: 0.75, peak: 0.9, cooldown: 0.3 };
+
+let token = null;
+let userProfile = null;
+let selectedGenres = [];
+let segments = [];
+let collectedTracks = [];
+
+// ── AUTH ──────────────────────────────────────────────
+function connectSpotify() {
+  const state = Math.random().toString(36).slice(2);
+  sessionStorage.setItem('spotify_state', state);
+  const url = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}&state=${state}&show_dialog=false`;
+  window.location.href = url;
+}
+
+function parseToken() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return null;
+  const params = Object.fromEntries(hash.split('&').map(p => p.split('=')));
+  if (params.access_token) {
+    window.history.replaceState(null, '', window.location.pathname);
+    return params.access_token;
+  }
+  return null;
+}
+
+async function fetchProfile(tok) {
+  const r = await fetch('https://api.spotify.com/v1/me', { headers: { Authorization: `Bearer ${tok}` } });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+// ── INIT ──────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  const tok = parseToken();
+  if (tok) {
+    token = tok;
+    sessionStorage.setItem('rc_token', tok);
+    userProfile = await fetchProfile(tok);
+    initApp();
+  } else {
+    const saved = sessionStorage.getItem('rc_token');
+    if (saved) {
+      const test = await fetchProfile(saved);
+      if (test) { token = saved; userProfile = test; initApp(); }
+    }
+  }
+});
+
+function initApp() {
+  buildGenreGrid();
+  initSegments();
+  updateUserUI();
+  goTo('profile');
+}
+
+function updateUserUI() {
+  if (!userProfile) return;
+  const name = userProfile.display_name || userProfile.id;
+  document.getElementById('user-display').textContent = name;
+  document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
+}
+
+// ── GENRES ────────────────────────────────────────────
+function buildGenreGrid() {
+  const el = document.getElementById('genre-grid');
+  el.innerHTML = '';
+  GENRES_LIST.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'genre-pill';
+    btn.textContent = g;
+    btn.onclick = () => toggleGenre(g, btn);
+    el.appendChild(btn);
+  });
+}
+
+function toggleGenre(g, btn) {
+  if (selectedGenres.includes(g)) {
+    selectedGenres = selectedGenres.filter(x => x !== g);
+    btn.classList.remove('on');
+  } else if (selectedGenres.length < 4) {
+    selectedGenres.push(g);
+    btn.classList.add('on');
+  } else {
+    toast('Max 4 genres selected');
+  }
+}
+
+// ── SEGMENTS ──────────────────────────────────────────
+function initSegments() {
+  segments = [
+    { pm: 6, ps: 30, dist: 1, mood: 'warmup' },
+    { pm: 6, ps: 0,  dist: 1, mood: 'steady' },
+    { pm: 5, ps: 30, dist: 1, mood: 'steady' },
+    { pm: 5, ps: 30, dist: 1, mood: 'peak' },
+    { pm: 6, ps: 0,  dist: 1, mood: 'cooldown' }
+  ];
+  renderSegments();
+}
+
+function renderSegments() {
+  const c = document.getElementById('seg-container');
+  c.innerHTML = '';
+  segments.forEach((seg, i) => {
+    const row = document.createElement('div');
+    row.className = 'seg-row';
+    row.innerHTML = `
+      <div class="seg-index">${i+1}</div>
+      <div class="pace-wrap">
+        <input type="number" min="3" max="12" value="${seg.pm}" style="width:44px; padding:8px 6px; text-align:center;" onchange="updSeg(${i},'pm',this.value)" />
+        <span class="pace-sep">:</span>
+        <input type="number" min="0" max="59" step="5" value="${String(seg.ps).padStart(2,'0')}" style="width:44px; padding:8px 6px; text-align:center;" onchange="updSeg(${i},'ps',this.value)" />
+      </div>
+      <input type="number" min="0.1" max="20" step="0.5" value="${seg.dist}" style="text-align:center; padding:8px 6px;" onchange="updSeg(${i},'dist',this.value)" />
+      <select class="mood-${seg.mood}" onchange="updSeg(${i},'mood',this.value); this.className='mood-'+this.value;" style="padding:8px 4px; font-size:12px;">
+        ${Object.entries(MOOD_LABELS).map(([k,v]) => `<option value="${k}" ${seg.mood===k?'selected':''}>${v}</option>`).join('')}
+      </select>
+      ${segments.length > 1 ? `<button class="seg-del" onclick="delSeg(${i})" aria-label="Remove">✕</button>` : '<div></div>'}
+    `;
+    c.appendChild(row);
+  });
+}
+
+function updSeg(i, k, v) {
+  segments[i][k] = k === 'mood' ? v : parseFloat(v) || 0;
+  if (k !== 'mood') renderSegments();
+}
+function addSeg() { segments.push({ pm: 6, ps: 0, dist: 1, mood: 'steady' }); renderSegments(); }
+function delSeg(i) { segments.splice(i, 1); renderSegments(); }
+
+// ── BPM CALC ──────────────────────────────────────────
+function calcBPM(pm, ps) {
+  const h = parseFloat(document.getElementById('height').value) || 175;
+  const stride = 0.413 * h / 100;
+  const paceS = pm * 60 + ps;
+  const speed = 1000 / paceS;
+  return Math.round(speed / stride);
+}
+
+function formatPace(pm, ps) {
+  return `${pm}:${String(ps).padStart(2,'0')}`;
+}
+
+function totalDurationSec() {
+  return segments.reduce((s, g) => s + (g.pm * 60 + g.ps) * g.dist, 0);
+}
+
+function totalDist() {
+  return segments.reduce((s, g) => s + g.dist, 0);
+}
+
+// ── NAVIGATION ────────────────────────────────────────
+function goTo(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function goToWorkout() {
+  if (!selectedGenres.length) { toast('Pick at least 1 genre'); return; }
+  goTo('workout');
+}
+
+async function goToResults() {
+  goTo('results');
+  const totalSecs = totalDurationSec();
+  const totalMin = Math.round(totalSecs / 60);
+  const dist = totalDist();
+  const unit = document.getElementById('dist-unit').value;
+
+  document.getElementById('results-sub').textContent =
+    `${dist.toFixed(1)} ${unit} · ~${totalMin} min · ${segments.length} segments`;
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-box"><div class="stat-val">${dist.toFixed(1)}</div><div class="stat-lbl">${unit}</div></div>
+    <div class="stat-box"><div class="stat-val">${totalMin}</div><div class="stat-lbl">minutes</div></div>
+    <div class="stat-box"><div class="stat-val">${segments.length}</div><div class="stat-lbl">segments</div></div>
+  `;
+
+  const rc = document.getElementById('results-container');
+  rc.innerHTML = '';
+  collectedTracks = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const bpm = calcBPM(seg.pm, seg.ps);
+    const div = document.createElement('div');
+    div.className = 'result-seg fadein';
+    div.id = `rseg-${i}`;
+    const moodColor = MOOD_COLOR[seg.mood];
+    div.innerHTML = `
+      <div class="result-seg-header" onclick="toggleSeg(${i})">
+        <div class="rseg-num" style="background:${moodColor}22; color:${moodColor};">${i+1}</div>
+        <div class="rseg-info">
+          <div style="display:flex; align-items:baseline; gap:6px;">
+            <span class="rseg-bpm" style="color:${moodColor};">${bpm}</span>
+            <span class="rseg-bpm-unit">BPM</span>
+            <span class="rseg-mood-badge badge-${seg.mood}">${MOOD_LABELS[seg.mood]}</span>
+          </div>
+          <div class="rseg-pace">${formatPace(seg.pm, seg.ps)} min/${unit} · ${seg.dist} ${unit}</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="arrow-${i}" style="color:var(--muted); flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div class="result-seg-body" id="body-${i}">
+        <div class="loading-bar"><div class="loading-bar-fill" id="lbar-${i}"></div></div>
+        <div class="seg-loading" id="track-list-${i}"><span class="spinner"></span> Finding songs for this segment…</div>
+      </div>
+    `;
+    rc.appendChild(div);
+
+    fetchTracksForSeg(i, seg, bpm);
+  }
+}
+
+// ── SPOTIFY TRACK FETCH ───────────────────────────────
+async function fetchTracksForSeg(i, seg, bpm) {
+  const lbar = document.getElementById(`lbar-${i}`);
+  const tlist = document.getElementById(`track-list-${i}`);
+
+  try {
+    lbar.style.width = '40%';
+    const seeds = selectedGenres.slice(0, 2).map(g => GENRE_SEEDS[g] || g.toLowerCase()).join(',');
+    const energy = ENERGY_MAP[seg.mood];
+    const bpmLow = bpm - 5;
+    const bpmHigh = bpm + 5;
+
+    const params = new URLSearchParams({
+      seed_genres: seeds,
+      target_tempo: bpm,
+      min_tempo: bpmLow,
+      max_tempo: bpmHigh,
+      target_energy: energy,
+      limit: 5,
+      market: 'GR'
+    });
+
+    const r = await fetch(`https://api.spotify.com/v1/recommendations?${params}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    lbar.style.width = '100%';
+
+    if (!r.ok) {
+      const err = await r.json();
+      tlist.innerHTML = `<div class="seg-error">Could not load tracks: ${err.error?.message || 'Unknown error'}</div>`;
+      return;
+    }
+
+    const data = await r.json();
+    const tracks = data.tracks || [];
+
+    tracks.forEach(t => collectedTracks.push(t));
+
+    if (!tracks.length) {
+      tlist.innerHTML = `<div class="seg-error">No tracks found for this BPM range. Try different genres.</div>`;
+      return;
+    }
+
+    tlist.innerHTML = tracks.map(t => {
+      const img = t.album?.images?.[2]?.url;
+      const imgEl = img
+        ? `<img class="track-img" src="${img}" alt="" loading="lazy" />`
+        : `<div class="track-img-placeholder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-2c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/></svg></div>`;
+      const artistNames = t.artists.map(a => a.name).join(', ');
+      return `
+        <div class="track-row">
+          ${imgEl}
+          <div class="track-info">
+            <div class="track-name">${t.name}</div>
+            <div class="track-artist">${artistNames}</div>
+          </div>
+          <span class="track-bpm-badge">${Math.round(t.tempo ?? bpm)} BPM</span>
+          <a href="${t.external_urls?.spotify}" target="_blank" class="track-open" aria-label="Open in Spotify">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+          </a>
+        </div>
+      `;
+    }).join('');
+
+  } catch (e) {
+    tlist.innerHTML = `<div class="seg-error">Network error. Check connection.</div>`;
+  }
+}
+
+function toggleSeg(i) {
+  const body = document.getElementById(`body-${i}`);
+  const arrow = document.getElementById(`arrow-${i}`);
+  body.classList.toggle('collapsed');
+  arrow.style.transform = body.classList.contains('collapsed') ? 'rotate(-90deg)' : '';
+}
+
+// ── SAVE PLAYLIST ─────────────────────────────────────
+async function savePlaylist() {
+  if (!token || !userProfile) { toast('Not connected to Spotify'); return; }
+  if (!collectedTracks.length) { toast('No tracks to save yet'); return; }
+
+  const btn = document.getElementById('btn-save');
+  const status = document.getElementById('save-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creating playlist…';
+  status.textContent = '';
+
+  try {
+    const dist = totalDist().toFixed(1);
+    const unit = document.getElementById('dist-unit').value;
+    const name = `RunCast ${dist}${unit} — ${new Date().toLocaleDateString('el-GR')}`;
+
+    const createRes = await fetch(`https://api.spotify.com/v1/users/${userProfile.id}/playlists`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, description: 'Generated by RunCast — matched to your pace and energy.', public: false })
+    });
+    const playlist = await createRes.json();
+
+    const uris = collectedTracks.map(t => t.uri);
+    await fetch(`https://api.spotify.com/v1/playlists/${playlist.id}/tracks`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uris })
+    });
+
+    status.innerHTML = `✓ Saved! <a href="${playlist.external_urls?.spotify}" target="_blank" style="color:var(--green);">Open in Spotify →</a>`;
+    btn.innerHTML = '✓ Playlist saved';
+    btn.style.background = '#17a349';
+
+  } catch (e) {
+    status.textContent = 'Something went wrong. Try again.';
+    btn.disabled = false;
+    btn.innerHTML = 'Save playlist to Spotify';
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
