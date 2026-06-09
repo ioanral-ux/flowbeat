@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RunCast — Run to the beat</title>
-<meta name="description" content="Generate the perfect running playlist matched to your pace, cadence and energy — powered by Spotify." />
+<title>FlowBeat — Not a training app. Just the best music companion for your training.</title>
+<meta name="description" content="FlowBeat generates a Spotify playlist matched to your running cadence and energy — segment by segment." />
 <meta name="theme-color" content="#0a0a0a" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -472,7 +472,7 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
 <div class="screen active" id="screen-splash">
   <div class="splash-bg"></div>
   <div class="fadein">
-    <div class="splash-logo">Run<span>Cast</span></div>
+    <div class="splash-logo">Flow<span>Beat</span></div>
     <p class="splash-tag">Run to the beat</p>
     <div class="splash-actions">
       <button class="btn btn-spotify" id="btn-connect-spotify" onclick="connectSpotify()">
@@ -492,7 +492,7 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
 ════════════════════════════════ -->
 <div class="screen" id="screen-profile">
   <div class="topbar">
-    <div class="topbar-logo">Run<span>Cast</span></div>
+    <div class="topbar-logo">Flow<span>Beat</span></div>
     <div class="topbar-user" id="user-display"></div>
     <div class="topbar-avatar" id="user-avatar">?</div>
   </div>
@@ -544,7 +544,7 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Back
     </button>
-    <div class="topbar-logo" style="text-align:right;">Run<span>Cast</span></div>
+    <div class="topbar-logo" style="text-align:right;">Flow<span>Beat</span></div>
   </div>
   <div class="steps-wrap">
     <div class="steps-bar">
@@ -584,7 +584,7 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Edit
     </button>
-    <div class="topbar-logo" style="text-align:right;">Run<span>Cast</span></div>
+    <div class="topbar-logo" style="text-align:right;">Flow<span>Beat</span></div>
   </div>
   <div class="steps-wrap">
     <div class="steps-bar">
@@ -617,7 +617,7 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
 
 <script>
 const CLIENT_ID = '4df3cbe30b1146c9a64dea80b868d0b2';
-const REDIRECT_URI = 'https://ioanral-ux.github.io/runcast/';
+const REDIRECT_URI = 'https://ioanral-ux.github.io/flowbeat/';
 const SCOPES = 'playlist-modify-public playlist-modify-private user-read-private user-read-email';
 const GENRES_LIST = ['Rock','Pop','Hip-Hop','Electronic','R&B','Indie','Metal','Jazz','Classical','Latin','Reggae','Country','Funk','Punk'];
 const MOOD_LABELS = { warmup:'Warmup', steady:'Steady', push:'Push', peak:'Peak 🔥', cooldown:'Cooldown' };
@@ -918,17 +918,15 @@ async function fetchTracksForSeg(i, seg, bpm) {
     lbar.style.width = '40%';
     const seeds = selectedGenres.slice(0, 2).map(g => GENRE_SEEDS[g] || g.toLowerCase()).join(',');
     const energy = ENERGY_MAP[seg.mood];
-    const bpmLow = bpm - 5;
-    const bpmHigh = bpm + 5;
 
     const params = new URLSearchParams({
       seed_genres: seeds,
       target_tempo: bpm,
-      min_tempo: bpmLow,
-      max_tempo: bpmHigh,
+      min_tempo: bpm - 8,
+      max_tempo: bpm + 8,
       target_energy: energy,
-      limit: 5,
-      market: 'GR'
+      min_energy: Math.max(0, energy - 0.2),
+      limit: 6
     });
 
     const r = await fetch(`https://api.spotify.com/v1/recommendations?${params}`, {
@@ -937,46 +935,69 @@ async function fetchTracksForSeg(i, seg, bpm) {
 
     lbar.style.width = '100%';
 
+    if (r.status === 401) {
+      const newTok = await refreshToken();
+      if (newTok) { token = newTok; fetchTracksForSeg(i, seg, bpm); return; }
+      tlist.innerHTML = `<div class="seg-error">Session expired. <a href="#" onclick="connectSpotify()" style="color:var(--green)">Reconnect Spotify</a></div>`;
+      return;
+    }
+
     if (!r.ok) {
-      const err = await r.json();
-      tlist.innerHTML = `<div class="seg-error">Could not load tracks: ${err.error?.message || 'Unknown error'}</div>`;
+      let msg = `HTTP ${r.status}`;
+      try { const err = await r.json(); msg = err.error?.message || msg; } catch {}
+      tlist.innerHTML = `<div class="seg-error">Spotify error: ${msg}</div>`;
       return;
     }
 
     const data = await r.json();
-    const tracks = data.tracks || [];
-
-    tracks.forEach(t => collectedTracks.push(t));
+    let tracks = data.tracks || [];
 
     if (!tracks.length) {
-      tlist.innerHTML = `<div class="seg-error">No tracks found for this BPM range. Try different genres.</div>`;
+      // Retry without tempo constraint — energy match only
+      const p2 = new URLSearchParams({ seed_genres: seeds, target_energy: energy, limit: 6 });
+      const r2 = await fetch(`https://api.spotify.com/v1/recommendations?${p2}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const d2 = await r2.json();
+      tracks = d2.tracks || [];
+    }
+
+    if (!tracks.length) {
+      tlist.innerHTML = `<div class="seg-error">No tracks found. Try selecting different genres.</div>`;
       return;
     }
 
-    tlist.innerHTML = tracks.map(t => {
-      const img = t.album?.images?.[2]?.url;
-      const imgEl = img
-        ? `<img class="track-img" src="${img}" alt="" loading="lazy" />`
-        : `<div class="track-img-placeholder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-2c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/></svg></div>`;
-      const artistNames = t.artists.map(a => a.name).join(', ');
-      return `
-        <div class="track-row">
-          ${imgEl}
-          <div class="track-info">
-            <div class="track-name">${t.name}</div>
-            <div class="track-artist">${artistNames}</div>
-          </div>
-          <span class="track-bpm-badge">${Math.round(t.tempo ?? bpm)} BPM</span>
-          <a href="${t.external_urls?.spotify}" target="_blank" class="track-open" aria-label="Open in Spotify">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-          </a>
-        </div>
-      `;
-    }).join('');
+    tracks.forEach(t => collectedTracks.push(t));
+    renderTracks(tlist, tracks, bpm);
 
   } catch (e) {
-    tlist.innerHTML = `<div class="seg-error">Network error. Check connection.</div>`;
+    console.error('fetchTracksForSeg:', e);
+    tlist.innerHTML = `<div class="seg-error">Error loading tracks: ${e.message}</div>`;
   }
+}
+
+function renderTracks(container, tracks, bpm) {
+  container.innerHTML = tracks.map(t => {
+    const img = t.album?.images?.[2]?.url;
+    const imgEl = img
+      ? `<img class="track-img" src="${img}" alt="" loading="lazy" />`
+      : `<div class="track-img-placeholder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-2c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/></svg></div>`;
+    const artistNames = t.artists.map(a => a.name).join(', ');
+    const trackBpm = t.tempo ? Math.round(t.tempo) : bpm;
+    return `
+      <div class="track-row">
+        ${imgEl}
+        <div class="track-info">
+          <div class="track-name">${t.name}</div>
+          <div class="track-artist">${artistNames}</div>
+        </div>
+        <span class="track-bpm-badge">${trackBpm} BPM</span>
+        <a href="${t.external_urls?.spotify}" target="_blank" class="track-open" aria-label="Open in Spotify">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+        </a>
+      </div>
+    `;
+  }).join('');
 }
 
 function toggleSeg(i) {

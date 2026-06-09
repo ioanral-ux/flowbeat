@@ -1,22 +1,14 @@
 {
-  "name": "RunCast",
-  "short_name": "RunCast",
-  "description": "Generate the perfect running playlist matched to your pace and energy",
-  "start_url": "/runcast/",
+  "name": "FlowBeat",
+  "short_name": "FlowBeat",
+  "description": "Not a training app. Just the best music companion for your training.",
+  "start_url": "/flowbeat/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
   "orientation": "portrait",
   "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
