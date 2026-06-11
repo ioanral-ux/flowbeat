@@ -416,6 +416,131 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
 .save-sub { font-size: 12px; color: var(--muted); margin-bottom: 1rem; }
 .save-status { font-size: 13px; color: var(--green); margin-top: 8px; min-height: 20px; text-align: center; }
 
+/* TIMELINE */
+.timeline-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.timeline-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.timeline-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.timeline-seg {
+  position: relative;
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 4px;
+  flex-shrink: 0;
+}
+.timeline-seg-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+}
+.timeline-seg-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  transition: width 0.4s ease;
+  opacity: 0.85;
+}
+.timeline-seg-overflow {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  background: rgba(239,68,68,0.6);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+.timeline-labels {
+  display: flex;
+  gap: 2px;
+}
+.timeline-label {
+  font-size: 9px;
+  color: var(--muted2);
+  text-align: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.timeline-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.timeline-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+.coverage-text {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.coverage-text span { color: var(--green); font-weight: 500; }
+.coverage-text span.over { color: #ef4444; }
+
+/* TRACK SELECTION */
+.track-row { cursor: pointer; }
+.track-row.selected { background: rgba(29,185,84,0.08); }
+.track-add-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.track-add-btn:hover { border-color: var(--green); color: var(--green); }
+.track-add-btn.added { background: var(--green); border-color: var(--green); color: #000; }
+.track-duration { font-size: 10px; color: var(--muted2); margin-top: 1px; }
+
+/* OPEN IN SPOTIFY FOOTER */
+.open-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+.open-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.open-sub { font-size: 12px; color: var(--muted); margin-bottom: 1rem; line-height: 1.5; }
+.selected-count {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 8px;
+  min-height: 20px;
+}
+.selected-count span { color: var(--green); font-weight: 500; }
+
 /* BOTTOM NAV AREA */
 .bottom-spacer { height: 80px; }
 
@@ -592,21 +717,33 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
       <div class="step-pip active"></div>
       <div class="step-pip active"></div>
     </div>
-    <div class="step-text">Step 3 of 3 — Your playlist</div>
+    <div class="step-text">Step 3 of 3 — Build your playlist</div>
   </div>
   <div class="inner-screen fadein">
     <div class="section-title">Your FlowBeat</div>
-    <p class="section-sub" id="results-sub">Matched to your cadence and energy.</p>
-    <div class="stats-row" id="stats-row"></div>
+    <p class="section-sub" id="results-sub">Pick the songs you want. Watch the timeline fill up.</p>
+
+    <!-- WORKOUT TIMELINE -->
+    <div class="timeline-wrap">
+      <div class="timeline-title">
+        <span>Workout timeline</span>
+        <span class="coverage-text" id="coverage-text">0 of <span id="total-dur-label">0</span> min covered</span>
+      </div>
+      <div class="timeline-bar" id="timeline-bar"></div>
+      <div class="timeline-labels" id="timeline-labels"></div>
+    </div>
+
     <div id="results-container"></div>
-    <div class="save-section">
-      <div class="save-title">Save to Spotify</div>
-      <div class="save-sub">Creates a playlist in your Spotify account you can play on any device.</div>
-      <button class="btn btn-primary" onclick="savePlaylist()" id="btn-save">
+
+    <!-- OPEN IN SPOTIFY -->
+    <div class="open-section" id="open-section">
+      <div class="open-title">Open in Spotify</div>
+      <div class="open-sub">Pick the songs you want above, then open them all in Spotify. Add them to a playlist there — you stay in control.</div>
+      <button class="btn btn-primary" onclick="openInSpotify()" id="btn-open" disabled>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg>
-        Save playlist to Spotify
+        Open selected in Spotify
       </button>
-      <div class="save-status" id="save-status"></div>
+      <div class="selected-count" id="selected-count">Select songs above to build your playlist</div>
     </div>
     <div class="bottom-spacer"></div>
   </div>
@@ -899,33 +1036,39 @@ function goToWorkout() {
   goTo('workout');
 }
 
+// Selected tracks per segment: { segIndex: [{ track, durationSec }] }
+let selectedTracks = {};
+
 async function goToResults() {
   goTo('results');
+  selectedTracks = {};
+  collectedTracks = [];
+
   const totalSecs = totalDurationSec();
   const totalMin = Math.round(totalSecs / 60);
   const dist = totalDist();
   const unit = document.getElementById('dist-unit').value;
 
   document.getElementById('results-sub').textContent =
-    `${dist.toFixed(1)} ${unit} · ~${totalMin} min · ${segments.length} segments`;
+    `${dist.toFixed(1)} ${unit} · ~${totalMin} min · Pick songs for each segment`;
+  document.getElementById('total-dur-label').textContent = totalMin;
 
-  document.getElementById('stats-row').innerHTML = `
-    <div class="stat-box"><div class="stat-val">${dist.toFixed(1)}</div><div class="stat-lbl">${unit}</div></div>
-    <div class="stat-box"><div class="stat-val">${totalMin}</div><div class="stat-lbl">minutes</div></div>
-    <div class="stat-box"><div class="stat-val">${segments.length}</div><div class="stat-lbl">segments</div></div>
-  `;
+  // Build timeline bar
+  buildTimeline(totalSecs);
 
   const rc = document.getElementById('results-container');
   rc.innerHTML = '';
-  collectedTracks = [];
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     const bpm = calcBPM(seg.pm, seg.ps);
+    const segSecs = (seg.pm * 60 + seg.ps) * seg.dist;
+    const segMins = Math.round(segSecs / 60);
+    const moodColor = MOOD_COLOR[seg.mood];
+
     const div = document.createElement('div');
     div.className = 'result-seg fadein';
     div.id = `rseg-${i}`;
-    const moodColor = MOOD_COLOR[seg.mood];
     div.innerHTML = `
       <div class="result-seg-header" onclick="toggleSeg(${i})">
         <div class="rseg-num" style="background:${moodColor}22; color:${moodColor};">${i+1}</div>
@@ -935,9 +1078,12 @@ async function goToResults() {
             <span class="rseg-bpm-unit">BPM</span>
             <span class="rseg-mood-badge badge-${seg.mood}">${MOOD_LABELS[seg.mood]}</span>
           </div>
-          <div class="rseg-pace">${formatPace(seg.pm, seg.ps)} min/${unit} · ${seg.dist} ${unit}</div>
+          <div class="rseg-pace">${formatPace(seg.pm, seg.ps)} min/${unit} · ${seg.dist} ${unit} · ${segMins} min</div>
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="arrow-${i}" style="color:var(--muted); flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11px; color:var(--muted);" id="seg-coverage-${i}">0/${segMins}m</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="arrow-${i}" style="color:var(--muted); flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
       </div>
       <div class="result-seg-body" id="body-${i}">
         <div class="loading-bar"><div class="loading-bar-fill" id="lbar-${i}"></div></div>
@@ -945,9 +1091,120 @@ async function goToResults() {
       </div>
     `;
     rc.appendChild(div);
-
     fetchTracksForSeg(i, seg, bpm);
   }
+}
+
+function buildTimeline(totalSecs) {
+  const bar = document.getElementById('timeline-bar');
+  const labels = document.getElementById('timeline-labels');
+  bar.innerHTML = '';
+  labels.innerHTML = '';
+
+  segments.forEach((seg, i) => {
+    const segSecs = (seg.pm * 60 + seg.ps) * seg.dist;
+    const pct = (segSecs / totalSecs * 100).toFixed(2);
+    const color = MOOD_COLOR[seg.mood];
+
+    const segEl = document.createElement('div');
+    segEl.className = 'timeline-seg';
+    segEl.id = `tseg-${i}`;
+    segEl.style.width = `${pct}%`;
+    segEl.innerHTML = `
+      <div class="timeline-seg-bg" style="background:${color};"></div>
+      <div class="timeline-seg-fill" id="tfill-${i}" style="background:${color};"></div>
+      <div class="timeline-seg-overflow" id="toverflow-${i}"></div>
+    `;
+    bar.appendChild(segEl);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'timeline-label';
+    lbl.style.width = `${pct}%`;
+    lbl.textContent = `${i+1}`;
+    labels.appendChild(lbl);
+  });
+}
+
+function updateTimeline() {
+  const totalWorkoutSecs = totalDurationSec();
+  let totalSelectedSecs = 0;
+
+  segments.forEach((seg, i) => {
+    const segWorkoutSecs = (seg.pm * 60 + seg.ps) * seg.dist;
+    const selected = selectedTracks[i] || [];
+    const selectedSecs = selected.reduce((s, t) => s + t.durationSec, 0);
+    totalSelectedSecs += Math.min(selectedSecs, segWorkoutSecs);
+
+    const fillPct = Math.min(100, (selectedSecs / segWorkoutSecs) * 100);
+    const overflowPct = selectedSecs > segWorkoutSecs
+      ? Math.min(100, ((selectedSecs - segWorkoutSecs) / segWorkoutSecs) * 100)
+      : 0;
+
+    const fill = document.getElementById(`tfill-${i}`);
+    const overflow = document.getElementById(`toverflow-${i}`);
+    if (fill) fill.style.width = `${fillPct}%`;
+    if (overflow) overflow.style.width = `${overflowPct}%`;
+
+    // Update segment coverage label
+    const covEl = document.getElementById(`seg-coverage-${i}`);
+    if (covEl) {
+      const selMin = Math.round(selectedSecs / 60 * 10) / 10;
+      const worMin = Math.round(segWorkoutSecs / 60);
+      covEl.textContent = `${selMin}/${worMin}m`;
+      covEl.style.color = selectedSecs >= segWorkoutSecs ? 'var(--green)' : 'var(--muted)';
+    }
+  });
+
+  // Update coverage text
+  const totalMin = Math.round(totalWorkoutSecs / 60);
+  const coveredMin = Math.round(totalSelectedSecs / 60 * 10) / 10;
+  const covEl = document.getElementById('coverage-text');
+  if (covEl) {
+    const allCovered = totalSelectedSecs >= totalWorkoutSecs;
+    covEl.innerHTML = `<span class="${allCovered ? '' : ''}" style="color:${allCovered ? 'var(--green)' : 'var(--muted)'}">${coveredMin} of ${totalMin} min covered</span>`;
+  }
+
+  // Count total selected
+  const allSelected = Object.values(selectedTracks).flat();
+  const countEl = document.getElementById('selected-count');
+  const btn = document.getElementById('btn-open');
+  if (allSelected.length > 0) {
+    const totalMusicMins = Math.round(allSelected.reduce((s, t) => s + t.durationSec, 0) / 60 * 10) / 10;
+    if (countEl) countEl.innerHTML = `<span>${allSelected.length} tracks</span> · ${totalMusicMins} min of music selected`;
+    if (btn) btn.disabled = false;
+  } else {
+    if (countEl) countEl.textContent = 'Select songs above to build your playlist';
+    if (btn) btn.disabled = true;
+  }
+}
+
+function toggleTrack(segIdx, trackIdx, uri, durationMs, btnEl, rowEl) {
+  if (!selectedTracks[segIdx]) selectedTracks[segIdx] = [];
+  const existing = selectedTracks[segIdx].findIndex(t => t.uri === uri);
+  if (existing >= 0) {
+    selectedTracks[segIdx].splice(existing, 1);
+    btnEl.classList.remove('added');
+    btnEl.textContent = '+';
+    rowEl.classList.remove('selected');
+  } else {
+    selectedTracks[segIdx].push({ uri, durationSec: durationMs / 1000 });
+    btnEl.classList.add('added');
+    btnEl.textContent = '✓';
+    rowEl.classList.add('selected');
+  }
+  updateTimeline();
+}
+
+function openInSpotify() {
+  const allSelected = Object.values(selectedTracks).flat();
+  if (!allSelected.length) { toast('Select some songs first'); return; }
+  // Open each track in Spotify — user can add to playlist from there
+  allSelected.forEach((t, i) => {
+    setTimeout(() => {
+      window.open(`https://open.spotify.com/track/${t.uri.replace('spotify:track:', '')}`, '_blank');
+    }, i * 300);
+  });
+  toast(`Opening ${allSelected.length} tracks in Spotify`);
 }
 
 // ── SPOTIFY TRACK FETCH ───────────────────────────────
@@ -1095,7 +1352,7 @@ async function fetchTracksForSeg(i, seg, bpm) {
       console.log(`[FlowBeat] Seg ${i}: no BPM data, showing top search results`);
       const tracks = candidates.slice(0, 5).map(t => ({ ...t, tempo: null }));
       tracks.forEach(t => collectedTracks.push(t));
-      renderTracks(tlist, tracks, bpm);
+      renderTracks(tlist, tracks, bpm, i);
       return;
     }
 
@@ -1108,7 +1365,7 @@ async function fetchTracksForSeg(i, seg, bpm) {
 
     const tracks = matched.map(({ track, bpm: tb }) => ({ ...track, tempo: tb }));
     tracks.forEach(t => collectedTracks.push(t));
-    renderTracks(tlist, tracks, bpm);
+    renderTracks(tlist, tracks, bpm, i);
 
   } catch (e) {
     console.error('fetchTracksForSeg:', e);
@@ -1147,85 +1404,7 @@ function toggleSeg(i) {
   arrow.style.transform = body.classList.contains('collapsed') ? 'rotate(-90deg)' : '';
 }
 
-// ── SAVE PLAYLIST ─────────────────────────────────────
-async function savePlaylist() {
-  if (!token || !userProfile) { toast('Not connected to Spotify'); return; }
-  if (!collectedTracks.length) { toast('No tracks to save yet'); return; }
 
-  const btn = document.getElementById('btn-save');
-  const status = document.getElementById('save-status');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Creating playlist…';
-  status.textContent = '';
-
-  try {
-    // Ensure token is still valid before making write calls
-    const valid = await ensureToken();
-    if (!valid) return;
-
-    const dist = totalDist().toFixed(1);
-    const unit = document.getElementById('dist-unit').value;
-    const name = `FlowBeat ${dist}${unit} — ${new Date().toLocaleDateString('el-GR')}`;
-
-    // Create playlist via /me/playlists (more reliable than /users/{id}/playlists)
-    const createRes = await fetch(`https://api.spotify.com/v1/me/playlists`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        name, 
-        description: 'Generated by FlowBeat — matched to your pace and energy.', 
-        public: true  // public is more reliable than private for API access
-      })
-    });
-
-    if (!createRes.ok) {
-      const err = await createRes.json();
-      console.error('[FlowBeat] Playlist create failed:', createRes.status, err);
-      status.textContent = `Could not create playlist (${createRes.status}): ${err.error?.message}`;
-      btn.disabled = false;
-      btn.innerHTML = 'Save playlist to Spotify';
-      return;
-    }
-
-    const playlist = await createRes.json();
-    console.log('[FlowBeat] Playlist created:', playlist.id, playlist.external_urls?.spotify);
-
-    if (!playlist.id) {
-      status.textContent = 'Playlist creation returned no ID. Try again.';
-      btn.disabled = false;
-      btn.innerHTML = 'Save playlist to Spotify';
-      return;
-    }
-
-    // Add tracks
-    const uris = [...new Set(collectedTracks.map(t => t.uri).filter(Boolean))];
-    console.log('[FlowBeat] Adding', uris.length, 'tracks');
-
-    const addRes = await fetch(`https://api.spotify.com/v1/playlists/${playlist.id}/tracks`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uris })
-    });
-
-    if (!addRes.ok) {
-      const err = await addRes.json();
-      console.error('[FlowBeat] Add tracks failed:', addRes.status, err);
-      status.textContent = `Playlist created but tracks failed to add: ${err.error?.message}`;
-      return;
-    }
-
-    const spotifyUrl = playlist.external_urls?.spotify;
-    status.innerHTML = `✓ Saved! <a href="${spotifyUrl}" target="_blank" style="color:var(--green);">Open in Spotify →</a>`;
-    btn.innerHTML = '✓ Playlist saved';
-    btn.style.background = '#17a349';
-
-  } catch (e) {
-    console.error('[FlowBeat] savePlaylist error:', e);
-    status.textContent = 'Something went wrong: ' + e.message;
-    btn.disabled = false;
-    btn.innerHTML = 'Save playlist to Spotify';
-  }
-}
 
 // ── HELPERS ───────────────────────────────────────────
 function toast(msg) {
