@@ -1040,23 +1040,47 @@ async function fetchTracksForSeg(i, seg, bpm) {
       })
       .filter(({ bpm }) => bpm !== null);
 
+    console.log(`[FlowBeat] Seg ${i}: target ${bpm} BPM, got ${results.length} results, ${withBpm.length} with BPM data`);
+    withBpm.forEach(({track, bpm: tb}) => console.log(`  ${track.name} — ${tb} BPM`));
+
+    // Also consider half-time BPM (some songs feel right at double their detected BPM)
     let matched = withBpm
-      .filter(({ bpm: tb }) => tb >= bpmLow && tb <= bpmHigh)
+      .filter(({ bpm: tb }) => {
+        const direct = tb >= bpm - 10 && tb <= bpm + 10;
+        const halfTime = (tb * 2) >= bpm - 10 && (tb * 2) <= bpm + 10;
+        const doubleTime = (tb / 2) >= bpm - 10 && (tb / 2) <= bpm + 10;
+        return direct || halfTime || doubleTime;
+      })
+      .map(({ track, bpm: tb }) => {
+        // Normalize to closest BPM variant
+        const variants = [tb, tb * 2, tb / 2];
+        const closest = variants.reduce((a, b) => Math.abs(a - bpm) < Math.abs(b - bpm) ? a : b);
+        return { track, bpm: closest };
+      })
       .sort((a, b) => Math.abs(a.bpm - bpm) - Math.abs(b.bpm - bpm))
       .slice(0, 6);
 
-    // Fallback: if fewer than 2 matches, widen window to ±15
+    // Fallback: if still no matches, just return best available sorted by BPM closeness
     if (matched.length < 2) {
+      console.log(`[FlowBeat] Seg ${i}: widening to best available`);
       matched = withBpm
-        .filter(({ bpm: tb }) => tb >= bpm - 15 && tb <= bpm + 15)
         .sort((a, b) => Math.abs(a.bpm - bpm) - Math.abs(b.bpm - bpm))
         .slice(0, 6);
+    }
+
+    // Last resort: no BPM data at all, just show search results
+    if (!matched.length && candidates.length) {
+      console.log(`[FlowBeat] Seg ${i}: no BPM data, showing top search results`);
+      const tracks = candidates.slice(0, 5).map(t => ({ ...t, tempo: null }));
+      tracks.forEach(t => collectedTracks.push(t));
+      renderTracks(tlist, tracks, bpm);
+      return;
     }
 
     lbar.style.width = '100%';
 
     if (!matched.length) {
-      tlist.innerHTML = `<div class="seg-error">No tracks matched this BPM. Try different genres.</div>`;
+      tlist.innerHTML = `<div class="seg-error">No tracks found. Try different genres.</div>`;
       return;
     }
 
