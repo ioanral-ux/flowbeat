@@ -1143,8 +1143,8 @@ async function savePlaylist() {
     const unit = document.getElementById('dist-unit').value;
     const name = `FlowBeat ${dist}${unit} — ${new Date().toLocaleDateString('el-GR')}`;
 
-    // Create playlist
-    const createRes = await fetch(`https://api.spotify.com/v1/users/${userProfile.id}/playlists`, {
+    // Create playlist via /me/playlists (more reliable than /users/{id}/playlists)
+    const createRes = await fetch(`https://api.spotify.com/v1/me/playlists`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
