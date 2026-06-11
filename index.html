@@ -994,17 +994,25 @@ async function fetchTracksForSeg(i, seg, bpm) {
       return;
     }
 
-    // Only use tracks that have a preview URL (needed for BPM detection)
-    const candidates = (searchData.tracks?.items || []).filter(t => t.preview_url);
-
-    if (!candidates.length) {
-      tlist.innerHTML = `<div class="seg-error">No previewable tracks found. Try different genres.</div>`;
+    const allTracks = searchData.tracks?.items || [];
+    if (!allTracks.length) {
+      tlist.innerHTML = `<div class="seg-error">No tracks found. Try different genres.</div>`;
       return;
     }
 
-    // Step 2: Send preview URLs to FlowBeat API for BPM detection (75%)
+    // Prefer tracks with preview URLs, fall back to all tracks
+    const candidates = allTracks.filter(t => t.preview_url).length >= 3
+      ? allTracks.filter(t => t.preview_url)
+      : allTracks;
+
+    // Step 2: Send to FlowBeat API for BPM detection (75%)
     lbar.style.width = '60%';
-    const payload = candidates.map(t => ({ id: t.id, previewUrl: t.preview_url }));
+    const payload = candidates.map(t => ({ 
+      id: t.id, 
+      previewUrl: t.preview_url || null,
+      title: t.name,
+      artist: t.artists[0]?.name
+    }));
 
     const apiRes = await fetch(`${FLOWBEAT_API}/analyze`, {
       method: 'POST',
