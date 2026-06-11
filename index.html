@@ -752,22 +752,20 @@ window.addEventListener('load', async () => {
   const code = urlParams.get('code');
 
   if (code) {
-    // Remove code from URL immediately to prevent double-processing
+    // Remove code from URL FIRST before any fetch calls
     window.history.replaceState(null, '', window.location.pathname);
     
-    // Small delay to ensure storage is settled after redirect
-    await new Promise(r => setTimeout(r, 100));
+    // Wait for URL change to settle
+    await new Promise(r => setTimeout(r, 300));
     
     token = await exchangeCode(code);
     if (token) {
-      // Verify token actually works before proceeding
       userProfile = await fetchProfile(token);
       if (userProfile) {
         initApp();
         return;
       }
     }
-    // Exchange failed — show splash and let user try again
     goTo('splash');
     return;
   }
@@ -966,7 +964,11 @@ async function spotifyGet(url) {
     token = newTok;
     r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   }
-  if (!r.ok) return null;
+  if (!r.ok) {
+    const errBody = await r.json().catch(() => ({}));
+    console.error('[FlowBeat] spotifyGet failed:', r.status, url, errBody);
+    return null;
+  }
   return r.json();
 }
 
@@ -986,14 +988,11 @@ async function fetchTracksForSeg(i, seg, bpm) {
     };
     const genreQuery = selectedGenres.slice(0, 2).join(' ');
     const moodQ = moodKeywords[seg.mood] || 'workout';
+    const q = encodeURIComponent(`${genreQuery} ${moodQ}`);
 
-    const searchParams = new URLSearchParams({
-      q: `${genreQuery} ${moodQ}`,
-      type: 'track',
-      limit: 30
-    });
-
-    const searchData = await spotifyGet(`https://api.spotify.com/v1/search?${searchParams}`);
+    const searchData = await spotifyGet(
+      `https://api.spotify.com/v1/search?q=${q}&type=track&limit=30`
+    );
     lbar.style.width = '50%';
 
     if (!searchData) {
