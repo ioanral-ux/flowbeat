@@ -952,6 +952,25 @@ async function goToResults() {
 // ── SPOTIFY TRACK FETCH ───────────────────────────────
 const FLOWBEAT_API = 'https://flowbeat-api.onrender.com';
 
+async function ensureToken() {
+  // Try a lightweight check — if it fails, refresh
+  const r = await fetch('https://api.spotify.com/v1/me', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (r.status === 401) {
+    console.log('[FlowBeat] Token expired, refreshing...');
+    const newTok = await refreshToken();
+    if (newTok) { token = newTok; return true; }
+    // Refresh failed — need to re-auth
+    localStorage.removeItem('rc_token');
+    localStorage.removeItem('rc_refresh');
+    toast('Session expired — reconnecting to Spotify...');
+    setTimeout(() => connectSpotify(), 1500);
+    return false;
+  }
+  return true;
+}
+
 async function spotifyGet(url) {
   let r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (r.status === 401) {
@@ -1139,6 +1158,10 @@ async function savePlaylist() {
   status.textContent = '';
 
   try {
+    // Ensure token is still valid before making write calls
+    const valid = await ensureToken();
+    if (!valid) return;
+
     const dist = totalDist().toFixed(1);
     const unit = document.getElementById('dist-unit').value;
     const name = `FlowBeat ${dist}${unit} — ${new Date().toLocaleDateString('el-GR')}`;
