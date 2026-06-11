@@ -866,10 +866,12 @@ function delSeg(i) { segments.splice(i, 1); renderSegments(); }
 // ── BPM CALC ──────────────────────────────────────────
 function calcBPM(pm, ps) {
   const h = parseFloat(document.getElementById('height').value) || 175;
-  const stride = 0.413 * h / 100;
+  // step_length = height(m) * 0.6 (running step, not stride)
+  const stepM = (h / 100) * 0.6;
   const paceS = pm * 60 + ps;
-  const speed = 1000 / paceS;
-  return Math.round(speed / stride);
+  const speedMS = 1000 / paceS;
+  // SPM = speed(m/s) / step_length(m) * 60
+  return Math.round((speedMS / stepM) * 60);
 }
 
 function formatPace(pm, ps) {
