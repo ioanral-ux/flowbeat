@@ -1503,15 +1503,15 @@ async function fetchTracksForSeg(i, seg, bpm) {
     lbar.style.width = '20%';
 
     const moodKeywords = {
-      warmup:   ['chill easy warm',    'light groove',         'morning easy'],
-      steady:   ['running workout',    'steady groove run',    'jogging tempo'],
-      push:     ['energy power drive', 'workout pump',         'high energy run'],
-      peak:     ['intense hype fire',  'peak power anthem',    'max energy pump'],
-      cooldown: ['calm relax cool',    'chill slow wind down', 'ambient easy']
+      warmup:   ['chill easy warm',      'morning feel good',    'light groove easy'],
+      steady:   ['workout beat',         'groove dance',         'hip hop beat'],
+      push:     ['energy power drive',   'workout pump',         'high energy'],
+      peak:     ['intense hype fire',    'peak power anthem',    'max energy pump'],
+      cooldown: ['calm relax cool',      'chill slow easy',      'smooth groove']
     };
-    const moods = moodKeywords[seg.mood] || ['workout run', 'fitness beat', 'cardio'];
+    const moods = moodKeywords[seg.mood] || ['workout', 'groove beat', 'dance'];
     const genre1 = selectedGenres[0] || 'workout';
-    const genre2 = selectedGenres[1] || selectedGenres[0] || 'running';
+    const genre2 = selectedGenres[1] || selectedGenres[0] || 'pop';
 
     // Half-BPM: a 90 BPM song at double-time feels like 180 BPM
     const halfBpm = Math.round(bpm / 2);
@@ -1560,7 +1560,36 @@ async function fetchTracksForSeg(i, seg, bpm) {
       if (t.duration_ms < MIN_MS || t.duration_ms > MAX_MS) mergedMap.delete(id);
     }
 
-    const allTracks = [...mergedMap.values()];
+    let allTracks = [...mergedMap.values()];
+
+    // ── Rescue pass: if filters left us thin, fire 2 genre-only searches ─
+    if (allTracks.length < 4) {
+      console.log(`[FlowBeat] Seg ${i}: only ${allTracks.length} candidates after filters, running rescue queries`);
+      const rescueQueries = [
+        `${genre1} popular hits`,
+        `${genre2} top tracks`
+      ];
+      const rescueResults = await Promise.all(
+        rescueQueries.map(q =>
+          spotifyGet(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`)
+            .catch(() => null)
+        )
+      );
+      for (const data of rescueResults) {
+        if (!data?.tracks?.items) continue;
+        for (const t of data.tracks.items) {
+          if (seenTrackIds.has(t.id)) continue;
+          if (mergedMap.has(t.id)) continue;
+          if (t.duration_ms < MIN_MS || t.duration_ms > MAX_MS) continue;
+          const key = `${t.name.toLowerCase().trim()}::${t.artists[0]?.name.toLowerCase().trim()}`;
+          if (titleSeen.has(key)) continue;
+          titleSeen.add(key);
+          mergedMap.set(t.id, t);
+        }
+      }
+      allTracks = [...mergedMap.values()];
+      console.log(`[FlowBeat] Seg ${i}: rescue brought pool to ${allTracks.length}`);
+    }
 
     // Prefer tracks with preview URLs for BPM detection; fall back to all
     // Cap at 20 — backend hard limit
