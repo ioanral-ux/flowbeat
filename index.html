@@ -424,6 +424,8 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
   padding: 1rem 1.25rem;
   margin-bottom: 1rem;
 }
+/* Sticky timeline inside left column */
+.timeline-sticky-bar .timeline-bar { margin-bottom: 6px; }
 .timeline-title {
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -549,20 +551,45 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
   overflow: hidden;
   height: calc(100vh - 120px);
 }
+.timeline-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  margin: -1rem -1rem 1rem;
+}
 .results-left {
   flex: 1;
-  overflow-y: auto;
+  max-width: 60%;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.timeline-sticky-bar {
+  flex-shrink: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  z-index: 10;
+}
+.results-left-inner {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
 }
 .results-left-inner {
   padding: 1rem 1rem 2rem;
   max-width: 100%;
 }
 .results-right {
-  width: 220px;
+  width: 320px;
   flex-shrink: 0;
   overflow-y: auto;
   background: var(--surface);
+  border-left: 1px solid var(--border);
 }
 
 /* PLAYLIST PANEL */
@@ -855,20 +882,19 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
   </div>
   <div class="results-layout">
 
-    <!-- LEFT: timeline + suggestions -->
+    <!-- LEFT: timeline (sticky) + suggestions -->
     <div class="results-left">
-      <div class="results-left-inner fadein">
-
-        <!-- WORKOUT TIMELINE -->
-        <div class="timeline-wrap">
-          <div class="timeline-title">
-            <span>Workout timeline</span>
-            <span id="coverage-text" style="font-size:11px; color:var(--muted);">0 of <span id="total-dur-label">0</span> min covered</span>
-          </div>
-          <div class="timeline-bar" id="timeline-bar"></div>
-          <div class="timeline-labels" id="timeline-labels"></div>
+      <!-- STICKY TIMELINE -->
+      <div class="timeline-sticky-bar">
+        <div class="timeline-title">
+          <span>Workout timeline</span>
+          <span id="coverage-text" style="font-size:11px; color:var(--muted);">0 of <span id="total-dur-label">0</span> min covered</span>
         </div>
-
+        <div class="timeline-bar" id="timeline-bar"></div>
+        <div class="timeline-labels" id="timeline-labels"></div>
+      </div>
+      <!-- SCROLLABLE SUGGESTIONS -->
+      <div class="results-left-inner fadein">
         <div id="results-container"></div>
         <div class="bottom-spacer"></div>
       </div>
