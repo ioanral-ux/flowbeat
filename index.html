@@ -941,6 +941,7 @@ let userProfile = null;
 let selectedGenres = [];
 let segments = [];
 let collectedTracks = [];
+let seenTrackIds = new Set(); // global dedup across all segments
 
 // ── AUTH (PKCE) ───────────────────────────────────────
 function generateRandom(len) {
@@ -1212,6 +1213,7 @@ async function goToResults() {
   goTo('results');
   selectedTracks = {};
   collectedTracks = [];
+  seenTrackIds = new Set();
 
   const totalSecs = totalDurationSec();
   const totalMin = Math.round(totalSecs / 60);
@@ -1497,44 +1499,67 @@ async function fetchTracksForSeg(i, seg, bpm) {
   const tlist = document.getElementById(`track-list-${i}`);
 
   try {
-    // Step 1: Search Spotify for candidates by genre + mood (25%)
-    lbar.style.width = '25%';
+    // ── Step 1: Build 3 varied queries for this segment ──────────────
+    lbar.style.width = '20%';
+
     const moodKeywords = {
-      warmup: 'chill easy warm',
-      steady: 'running workout steady',
-      push: 'energy power drive',
-      peak: 'intense hype pump fire',
-      cooldown: 'calm relax cool down'
+      warmup:   ['chill easy warm',    'light groove',         'morning easy'],
+      steady:   ['running workout',    'steady groove run',    'jogging tempo'],
+      push:     ['energy power drive', 'workout pump',         'high energy run'],
+      peak:     ['intense hype fire',  'peak power anthem',    'max energy pump'],
+      cooldown: ['calm relax cool',    'chill slow wind down', 'ambient easy']
     };
-    const genreQuery = selectedGenres.slice(0, 2).join(' ');
-    const moodQ = moodKeywords[seg.mood] || 'workout';
-    const q = encodeURIComponent(`${genreQuery} ${moodQ}`);
+    const moods = moodKeywords[seg.mood] || ['workout run', 'fitness beat', 'cardio'];
+    const genre1 = selectedGenres[0] || 'workout';
+    const genre2 = selectedGenres[1] || selectedGenres[0] || 'running';
 
-    const searchData = await spotifyGet(
-      `https://api.spotify.com/v1/search?q=${q}&type=track&limit=10`
+    // Half-BPM: a 90 BPM song at double-time feels like 180 BPM
+    const halfBpm = Math.round(bpm / 2);
+
+    const queries = [
+      `${genre1} ${moods[0]}`,               // primary: genre + mood variant 1
+      `${genre2} ${moods[1]}`,               // secondary: genre2 + mood variant 2
+      `${genre1} ${moods[2]} bpm ${halfBpm}` // half-BPM angle with genre
+    ];
+
+    // ── Step 2: Fire all 3 searches in parallel ───────────────────────
+    lbar.style.width = '35%';
+    const searchResults = await Promise.all(
+      queries.map(q =>
+        spotifyGet(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`)
+          .catch(() => null)
+      )
     );
-    lbar.style.width = '50%';
+    lbar.style.width = '55%';
 
-    if (!searchData) {
-      tlist.innerHTML = `<div class="seg-error">Could not search Spotify. Try reconnecting.</div>`;
-      return;
+    // ── Step 3: Merge + deduplicate by track ID ───────────────────────
+    const mergedMap = new Map();
+    for (const data of searchResults) {
+      if (!data?.tracks?.items) continue;
+      for (const t of data.tracks.items) {
+        if (!mergedMap.has(t.id)) mergedMap.set(t.id, t);
+      }
     }
 
-    const allTracks = searchData.tracks?.items || [];
+    // Remove tracks already shown in other segments
+    for (const id of seenTrackIds) mergedMap.delete(id);
+
+    const allTracks = [...mergedMap.values()];
+
     if (!allTracks.length) {
       tlist.innerHTML = `<div class="seg-error">No tracks found. Try different genres.</div>`;
       return;
     }
 
-    // Prefer tracks with preview URLs, fall back to all tracks
+    // Prefer tracks with preview URLs for BPM detection; fall back to all
     const candidates = allTracks.filter(t => t.preview_url).length >= 3
       ? allTracks.filter(t => t.preview_url)
       : allTracks;
 
-    // Step 2: Send to FlowBeat API for BPM detection (75%)
-    lbar.style.width = '60%';
-    const payload = candidates.map(t => ({ 
-      id: t.id, 
+    // ── Step 4: BPM detection via FlowBeat API ────────────────────────
+    lbar.style.width = '65%';
+    const payload = candidates.map(t => ({
+      id: t.id,
       previewUrl: t.preview_url || null,
       title: t.name,
       artist: t.artists[0]?.name
@@ -1555,50 +1580,46 @@ async function fetchTracksForSeg(i, seg, bpm) {
 
     const { results } = await apiRes.json();
 
-    // Step 3: Match by BPM — ±8 BPM window, then sort by closeness
-    const bpmLow = bpm - 8;
-    const bpmHigh = bpm + 8;
-
+    // ── Step 5: BPM matching — direct ±10, half-BPM, double-BPM ─────
     const withBpm = candidates
       .map(track => {
         const r = results.find(x => x.id === track.id);
         return { track, bpm: r?.bpm || null };
       })
-      .filter(({ bpm }) => bpm !== null);
+      .filter(({ bpm: tb }) => tb !== null);
 
-    console.log(`[FlowBeat] Seg ${i}: target ${bpm} BPM, got ${results.length} results, ${withBpm.length} with BPM data`);
-    withBpm.forEach(({track, bpm: tb}) => console.log(`  ${track.name} — ${tb} BPM`));
+    console.log(`[FlowBeat] Seg ${i}: target ${bpm} BPM, ${candidates.length} candidates, ${withBpm.length} with BPM`);
+    withBpm.forEach(({ track, bpm: tb }) => console.log(`  ${track.name} — ${tb} BPM`));
 
-    // Also consider half-time BPM (some songs feel right at double their detected BPM)
     let matched = withBpm
       .filter(({ bpm: tb }) => {
-        const direct = tb >= bpm - 10 && tb <= bpm + 10;
+        const direct   = tb       >= bpm - 10 && tb       <= bpm + 10;
         const halfTime = (tb * 2) >= bpm - 10 && (tb * 2) <= bpm + 10;
-        const doubleTime = (tb / 2) >= bpm - 10 && (tb / 2) <= bpm + 10;
-        return direct || halfTime || doubleTime;
+        const dblTime  = (tb / 2) >= bpm - 10 && (tb / 2) <= bpm + 10;
+        return direct || halfTime || dblTime;
       })
       .map(({ track, bpm: tb }) => {
-        // Normalize to closest BPM variant
+        // Display the closest BPM variant (so UI shows ~target BPM)
         const variants = [tb, tb * 2, tb / 2];
         const closest = variants.reduce((a, b) => Math.abs(a - bpm) < Math.abs(b - bpm) ? a : b);
         return { track, bpm: closest };
       })
       .sort((a, b) => Math.abs(a.bpm - bpm) - Math.abs(b.bpm - bpm))
-      .slice(0, 6);
+      .slice(0, 8); // show up to 8 options per segment
 
-    // Fallback: if still no matches, just return best available sorted by BPM closeness
+    // Fallback: widen to best available if too few matches
     if (matched.length < 2) {
       console.log(`[FlowBeat] Seg ${i}: widening to best available`);
       matched = withBpm
         .sort((a, b) => Math.abs(a.bpm - bpm) - Math.abs(b.bpm - bpm))
-        .slice(0, 6);
+        .slice(0, 8);
     }
 
-    // Last resort: no BPM data at all, just show search results
+    // Last resort: no BPM data, show raw search results
     if (!matched.length && candidates.length) {
-      console.log(`[FlowBeat] Seg ${i}: no BPM data, showing top search results`);
-      const tracks = candidates.slice(0, 5).map(t => ({ ...t, tempo: null }));
-      tracks.forEach(t => collectedTracks.push(t));
+      console.log(`[FlowBeat] Seg ${i}: no BPM data, showing top candidates`);
+      const tracks = candidates.slice(0, 6).map(t => ({ ...t, tempo: null }));
+      tracks.forEach(t => { collectedTracks.push(t); seenTrackIds.add(t.id); });
       renderTracks(tlist, tracks, bpm, i);
       return;
     }
@@ -1610,8 +1631,9 @@ async function fetchTracksForSeg(i, seg, bpm) {
       return;
     }
 
+    // ── Step 6: Register shown tracks so other segments skip them ────
     const tracks = matched.map(({ track, bpm: tb }) => ({ ...track, tempo: tb }));
-    tracks.forEach(t => collectedTracks.push(t));
+    tracks.forEach(t => { collectedTracks.push(t); seenTrackIds.add(t.id); });
     renderTracks(tlist, tracks, bpm, i);
 
   } catch (e) {
