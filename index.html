@@ -976,9 +976,9 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
         </div>
         <div id="playlist-segments"></div>
         <div class="playlist-panel-footer" id="playlist-footer" style="display:none;">
-          <button class="btn btn-primary" onclick="openInSpotify()" id="btn-open">
+          <button class="btn btn-primary" onclick="queueInSpotify()" id="btn-open">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg>
-            Open in Spotify
+            Queue in Spotify
           </button>
         </div>
       </div>
@@ -993,7 +993,7 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
 <script>
 const CLIENT_ID = '4df3cbe30b1146c9a64dea80b868d0b2';
 const REDIRECT_URI = 'https://ioanral-ux.github.io/flowbeat/';
-const SCOPES = 'playlist-modify-public playlist-modify-private user-read-private user-read-email';
+const SCOPES = 'playlist-modify-public playlist-modify-private user-read-private user-read-email user-modify-playback-state user-read-playback-state';
 const GENRES_LIST = ['Rock','Pop','Hip-Hop','Electronic','R&B','Indie','Metal','Jazz','Classical','Latin','Reggae','Country','Funk','Punk'];
 const MOOD_LABELS = { warmup:'Warmup', steady:'Steady', push:'Push', peak:'Peak 🔥', cooldown:'Cooldown' };
 const MOOD_COLOR = { warmup:'var(--mood-warmup)', steady:'var(--mood-steady)', push:'var(--mood-push)', peak:'var(--mood-peak)', cooldown:'var(--mood-cooldown)' };
@@ -1541,15 +1541,61 @@ function toggleTrack(segIdx, trackIdx, uri, durationMs, name, artist, img, bpm, 
   renderPlaylistPanel();
 }
 
-function openInSpotify() {
+async function queueInSpotify() {
   const allSelected = Object.values(selectedTracks).flat();
   if (!allSelected.length) { toast('Select some songs first'); return; }
-  allSelected.forEach((t, i) => {
-    setTimeout(() => {
-      window.open(`https://open.spotify.com/track/${t.uri.replace('spotify:track:', '')}`, '_blank');
-    }, i * 400);
-  });
-  toast(`Opening ${allSelected.length} tracks in Spotify`);
+
+  const btn = document.getElementById('btn-open');
+  btn.disabled = true;
+  btn.textContent = 'Queuing…';
+
+  // Check there's an active Spotify device
+  try {
+    const devices = await spotifyGet('https://api.spotify.com/v1/me/player/devices');
+    const active = devices?.devices?.find(d => d.is_active);
+    if (!active) {
+      toast('Open Spotify on any device first, then try again', 3500);
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg> Queue in Spotify`;
+      return;
+    }
+  } catch(e) {
+    // Non-fatal — proceed anyway, queue call will fail with a clear error if needed
+  }
+
+  // Queue each track in order with a small delay to avoid rate limiting
+  let queued = 0;
+  let failed = 0;
+  for (const t of allSelected) {
+    try {
+      const uri = t.uri || `spotify:track:${t.id}`;
+      const res = await fetch(
+        `https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(uri)}`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok || res.status === 204) {
+        queued++;
+      } else {
+        failed++;
+        console.warn(`Queue failed for ${t.name}: ${res.status}`);
+      }
+    } catch(e) {
+      failed++;
+    }
+    // Small delay between requests to respect rate limits
+    await new Promise(r => setTimeout(r, 150));
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg> Queue in Spotify`;
+
+  if (queued > 0 && failed === 0) {
+    toast(`✓ ${queued} songs queued in Spotify`);
+  } else if (queued > 0) {
+    toast(`${queued} queued, ${failed} failed`);
+  } else {
+    toast('Could not queue — open Spotify on a device first', 3500);
+  }
 }
 
 // ── SPOTIFY TRACK FETCH ───────────────────────────────
