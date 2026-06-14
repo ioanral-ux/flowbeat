@@ -803,6 +803,71 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
   vertical-align: middle;
   margin-right: 6px;
 }
+/* ── MODE SELECTOR ───────────────────────────────────── */
+.mode-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 1.25rem;
+}
+.mode-pill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border2);
+  background: var(--surface2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  font-family: var(--font-body);
+}
+.mode-pill:hover { border-color: var(--accent); color: var(--accent); }
+.mode-pill.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.mode-pill-emoji { font-size: 26px; line-height: 1; }
+.mode-pill-label { font-size: 13px; font-weight: 600; letter-spacing: 0.03em; }
+.mode-pill-sub { font-size: 10px; color: var(--muted2); }
+
+/* ── GYM BUILDER ─────────────────────────────────────── */
+.gym-block {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+.gym-block-num { font-size: 11px; font-weight: 700; color: var(--muted2); padding-top: 10px; }
+.gym-block-fields { display: flex; flex-direction: column; gap: 8px; }
+.gym-block-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.gym-field { display: flex; flex-direction: column; }
+.gym-field label { font-size: 10px; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+.gym-field input, .gym-field select { padding: 7px 8px; font-size: 13px; }
+.gym-field-sm input { width: 58px; text-align: center; }
+.gym-activity-select select { min-width: 160px; }
+.gym-intensity-pills { display: flex; gap: 5px; margin-top: 2px; }
+.gym-intensity-pill {
+  flex: 1; padding: 6px 4px; font-size: 11px; font-weight: 600;
+  border-radius: 6px; border: 1.5px solid var(--border2);
+  background: var(--surface); color: var(--muted);
+  cursor: pointer; text-align: center; transition: all 0.12s;
+}
+.gym-intensity-pill.active-low  { border-color: var(--mood-warmup); color: var(--mood-warmup); background: color-mix(in srgb, var(--mood-warmup) 12%, transparent); }
+.gym-intensity-pill.active-mid  { border-color: var(--mood-steady); color: var(--mood-steady); background: color-mix(in srgb, var(--mood-steady) 12%, transparent); }
+.gym-intensity-pill.active-high { border-color: var(--mood-peak);   color: var(--mood-peak);   background: color-mix(in srgb, var(--mood-peak)   12%, transparent); }
+.gym-duration-hint { font-size: 10px; color: var(--muted2); margin-top: 4px; }
+.gym-del { align-self: center; background: none; border: none; color: var(--muted2); cursor: pointer; font-size: 18px; padding: 4px; line-height: 1; }
+.gym-del:hover { color: var(--mood-peak); }
+
 </style>
 </head>
 <body>
@@ -853,10 +918,25 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
   </div>
   <div class="inner-screen fadein">
     <div class="section-title">Your profile</div>
-    <p class="section-sub">We use your height to calculate your natural running cadence.</p>
+    <p class="section-sub">Pick your activity, choose genres, and build your playlist.</p>
+
+    <!-- MODE SELECTOR -->
+    <div class="mode-selector">
+      <button class="mode-pill active" id="mode-run" onclick="setMode('run')">
+        <span class="mode-pill-emoji">🏃</span>
+        <span class="mode-pill-label">Run</span>
+        <span class="mode-pill-sub">Pace-based BPM</span>
+      </button>
+      <button class="mode-pill" id="mode-gym" onclick="setMode('gym')">
+        <span class="mode-pill-emoji">🏋️</span>
+        <span class="mode-pill-label">Gym</span>
+        <span class="mode-pill-sub">Sets &amp; reps</span>
+      </button>
+    </div>
 
     <div class="card">
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
+      <!-- Height — only shown in run mode -->
+      <div id="height-row" style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1rem;">
         <div>
           <label>Height (cm)</label>
           <input type="number" id="height" value="175" min="140" max="220" />
@@ -905,19 +985,32 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
     <div class="step-text">Step 2 of 3 — Your workout</div>
   </div>
   <div class="inner-screen fadein">
-    <div class="section-title">Your workout</div>
-    <p class="section-sub">One row per km. Set your pace and choose an energy mood for each segment.</p>
-    <div class="card">
-      <div style="display:grid; grid-template-columns:28px 1fr 1fr 1fr 28px; gap:8px; margin-bottom:8px; align-items:center;">
-        <div></div>
-        <div class="seg-col-head">Pace</div>
-        <div class="seg-col-head">Dist</div>
-        <div class="seg-col-head">Energy</div>
-        <div></div>
+    <div class="section-title" id="workout-title">Your workout</div>
+    <p class="section-sub" id="workout-sub">One row per km. Set your pace and choose an energy mood for each segment.</p>
+
+    <!-- RUN BUILDER -->
+    <div id="run-builder">
+      <div class="card">
+        <div style="display:grid; grid-template-columns:28px 1fr 1fr 1fr 28px; gap:8px; margin-bottom:8px; align-items:center;">
+          <div></div>
+          <div class="seg-col-head">Pace</div>
+          <div class="seg-col-head">Dist</div>
+          <div class="seg-col-head">Energy</div>
+          <div></div>
+        </div>
+        <div id="seg-container"></div>
+        <button class="add-seg" onclick="addSeg()">+ Add segment</button>
       </div>
-      <div id="seg-container"></div>
-      <button class="add-seg" onclick="addSeg()">+ Add segment</button>
     </div>
+
+    <!-- GYM BUILDER -->
+    <div id="gym-builder" style="display:none;">
+      <div class="card">
+        <div id="gym-container"></div>
+        <button class="add-seg" onclick="addGymBlock()">+ Add exercise block</button>
+      </div>
+    </div>
+
     <button class="btn btn-primary" onclick="goToResults()">
       Generate playlist
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M9 18V5l12-2v13M9 18c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2zm12-2c0 1.105-.895 2-2 2s-2-.895-2-2 .895-2 2-2 2 .895 2 2z"/></svg>
@@ -1004,6 +1097,35 @@ const GENRE_SEEDS = {
   'Country': 'country', 'Funk': 'funk', 'Punk': 'punk'
 };
 const ENERGY_MAP = { warmup: 0.4, steady: 0.6, push: 0.75, peak: 0.9, cooldown: 0.3 };
+
+// ── GYM MODE ──────────────────────────────────────────
+let appMode = 'run'; // 'run' | 'gym'
+let gymBlocks = [];  // array of { activity, sets, reps, rest, intensity }
+
+const GYM_ACTIVITIES = {
+  'weights':  { label: 'Weights',         emoji: '🏋️', bpm: { low:115, mid:128, high:138 } },
+  'hiit':     { label: 'HIIT',            emoji: '⚡', bpm: { low:140, mid:158, high:175 } },
+  'hiit-rest':{ label: 'HIIT Rest',       emoji: '😤', bpm: { low: 90, mid: 98, high:108 } },
+  'cardio':   { label: 'Cardio Machine',  emoji: '🚴', bpm: { low:125, mid:138, high:152 } },
+};
+
+const GYM_INTENSITY = {
+  low:  { label: 'Easy',     color: 'var(--mood-warmup)'  },
+  mid:  { label: 'Moderate', color: 'var(--mood-steady)'  },
+  high: { label: 'Hard',     color: 'var(--mood-peak)'    },
+};
+
+// Estimate block duration in seconds
+// sets * (reps * ~3s per rep) + (sets-1) * rest
+function gymBlockDuration(block) {
+  const workSec = block.sets * block.reps * 3;
+  const restSec = Math.max(0, block.sets - 1) * block.rest;
+  return workSec + restSec;
+}
+
+function gymBlockBPM(block) {
+  return GYM_ACTIVITIES[block.activity]?.bpm[block.intensity] ?? 128;
+}
 
 // ── THEME ─────────────────────────────────────────────
 const SUN_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
@@ -1225,7 +1347,109 @@ function toggleGenre(g, btn) {
   }
 }
 
-// ── SEGMENTS ──────────────────────────────────────────
+// ── MODE SWITCHING ────────────────────────────────────
+function setMode(mode) {
+  appMode = mode;
+  document.getElementById('mode-run').classList.toggle('active', mode === 'run');
+  document.getElementById('mode-gym').classList.toggle('active', mode === 'gym');
+  document.getElementById('height-row').style.display = mode === 'run' ? 'grid' : 'none';
+}
+
+function goToWorkout() {
+  if (!selectedGenres.length) { toast('Pick at least 1 genre'); return; }
+  if (appMode === 'run') {
+    document.getElementById('run-builder').style.display = '';
+    document.getElementById('gym-builder').style.display = 'none';
+    document.getElementById('workout-title').textContent = 'Your run';
+    document.getElementById('workout-sub').textContent = 'One row per km. Set your pace and choose an energy mood for each segment.';
+    initSegments();
+  } else {
+    document.getElementById('run-builder').style.display = 'none';
+    document.getElementById('gym-builder').style.display = '';
+    document.getElementById('workout-title').textContent = 'Your workout';
+    document.getElementById('workout-sub').textContent = 'Add exercise blocks. Duration is estimated automatically.';
+    initGymBlocks();
+  }
+  goTo('workout');
+}
+
+// ── GYM BLOCKS ────────────────────────────────────────
+function initGymBlocks() {
+  if (gymBlocks.length) { renderGymBlocks(); return; }
+  gymBlocks = [
+    { activity: 'weights', sets: 3, reps: 10, rest: 60, intensity: 'mid' },
+    { activity: 'hiit',    sets: 4, reps: 20, rest: 30, intensity: 'high' },
+    { activity: 'cardio',  sets: 1, reps: 20, rest: 60, intensity: 'mid' },
+  ];
+  renderGymBlocks();
+}
+
+function renderGymBlocks() {
+  const c = document.getElementById('gym-container');
+  c.innerHTML = '';
+  gymBlocks.forEach((b, i) => {
+    const durSec = gymBlockDuration(b);
+    const durMin = (durSec / 60).toFixed(1);
+    const act = GYM_ACTIVITIES[b.activity];
+    const div = document.createElement('div');
+    div.className = 'gym-block';
+    div.innerHTML = `
+      <div class="gym-block-num">${i+1}</div>
+      <div class="gym-block-fields">
+        <div class="gym-block-row">
+          <div class="gym-field gym-activity-select">
+            <label>Activity</label>
+            <select onchange="updGym(${i},'activity',this.value)">
+              ${Object.entries(GYM_ACTIVITIES).map(([k,v]) =>
+                `<option value="${k}" ${b.activity===k?'selected':''}>${v.emoji} ${v.label}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="gym-field gym-field-sm">
+            <label>Sets</label>
+            <input type="number" min="1" max="20" value="${b.sets}" onchange="updGym(${i},'sets',this.value)" />
+          </div>
+          <div class="gym-field gym-field-sm">
+            <label>Reps</label>
+            <input type="number" min="1" max="50" value="${b.reps}" onchange="updGym(${i},'reps',this.value)" />
+          </div>
+          <div class="gym-field gym-field-sm">
+            <label>Rest (s)</label>
+            <input type="number" min="0" max="300" step="15" value="${b.rest}" onchange="updGym(${i},'rest',this.value)" />
+          </div>
+        </div>
+        <div class="gym-block-row">
+          <div class="gym-field" style="flex:1;">
+            <label>Intensity</label>
+            <div class="gym-intensity-pills">
+              ${Object.entries(GYM_INTENSITY).map(([k,v]) =>
+                `<button class="gym-intensity-pill ${b.intensity===k?'active-'+k:''}"
+                  onclick="updGym(${i},'intensity','${k}')">${v.label}</button>`
+              ).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="gym-duration-hint">~${durMin} min · ${gymBlockBPM(b)} BPM target</div>
+      </div>
+      ${gymBlocks.length > 1
+        ? `<button class="gym-del" onclick="delGymBlock(${i})" aria-label="Remove">✕</button>`
+        : '<div></div>'}
+    `;
+    c.appendChild(div);
+  });
+}
+
+function updGym(i, k, v) {
+  gymBlocks[i][k] = (k === 'activity' || k === 'intensity') ? v : (parseInt(v) || 0);
+  renderGymBlocks();
+}
+function addGymBlock() {
+  gymBlocks.push({ activity: 'weights', sets: 3, reps: 10, rest: 60, intensity: 'mid' });
+  renderGymBlocks();
+}
+function delGymBlock(i) { gymBlocks.splice(i, 1); renderGymBlocks(); }
+
+
 function initSegments() {
   segments = [
     { pm: 6, ps: 30, dist: 1, mood: 'warmup' },
@@ -1297,42 +1521,64 @@ function goTo(name) {
   window.scrollTo(0, 0);
 }
 
-function goToWorkout() {
-  if (!selectedGenres.length) { toast('Pick at least 1 genre'); return; }
-  goTo('workout');
-}
+
 
 // Selected tracks per segment: { segIndex: [{ uri, durationSec, name, artist, img, bpm }] }
 let selectedTracks = {};
 
 async function goToResults() {
+  // Validate
+  if (appMode === 'gym' && !gymBlocks.length) { toast('Add at least one exercise block'); return; }
+  if (appMode === 'run' && !segments.length)  { toast('Add at least one segment'); return; }
+
   goTo('results');
   selectedTracks = {};
   collectedTracks = [];
   seenTrackIds = new Set();
 
-  const totalSecs = totalDurationSec();
+  // Normalise gym blocks into the same shape as run segments for the pipeline
+  const activeSegs = appMode === 'gym'
+    ? gymBlocks.map(b => ({
+        _gym: true,
+        activity: b.activity,
+        sets: b.sets,
+        reps: b.reps,
+        rest: b.rest,
+        intensity: b.intensity,
+        mood: b.intensity === 'high' ? 'peak' : b.intensity === 'low' ? 'warmup' : 'steady',
+        _durationSec: gymBlockDuration(b),
+        _bpm: gymBlockBPM(b),
+      }))
+    : segments;
+
+  const totalSecs = appMode === 'gym'
+    ? gymBlocks.reduce((s, b) => s + gymBlockDuration(b), 0)
+    : totalDurationSec();
   const totalMin = Math.round(totalSecs / 60);
-  const dist = totalDist();
-  const unit = document.getElementById('dist-unit').value;
 
   document.getElementById('total-dur-label').textContent = totalMin;
-
-  // Build timeline bar
-  buildTimeline(totalSecs);
-
-  // Init playlist panel segments (right column)
-  initPlaylistPanel();
+  buildTimeline(totalSecs, activeSegs);
+  initPlaylistPanel(activeSegs);
 
   const rc = document.getElementById('results-container');
   rc.innerHTML = '';
 
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    const bpm = calcBPM(seg.pm, seg.ps);
-    const segSecs = (seg.pm * 60 + seg.ps) * seg.dist;
-    const segMins = Math.round(segSecs / 60);
+  for (let i = 0; i < activeSegs.length; i++) {
+    const seg = activeSegs[i];
+    const bpm = seg._gym ? seg._bpm : calcBPM(seg.pm, seg.ps);
+    const segSecs = seg._gym ? seg._durationSec : (seg.pm * 60 + seg.ps) * seg.dist;
+    const segMins = (segSecs / 60).toFixed(1);
     const moodColor = MOOD_COLOR[seg.mood];
+    const unit = document.getElementById('dist-unit')?.value || 'km';
+
+    // Label line differs by mode
+    const infoLine = seg._gym
+      ? `${GYM_ACTIVITIES[seg.activity].emoji} ${GYM_ACTIVITIES[seg.activity].label} · ${seg.sets}×${seg.reps} reps · ${GYM_INTENSITY[seg.intensity].label}`
+      : `${formatPace(seg.pm, seg.ps)} min/${unit} · ${seg.dist} ${unit} · ${segMins} min`;
+
+    const moodLabel = seg._gym
+      ? `${GYM_INTENSITY[seg.intensity].label}`
+      : MOOD_LABELS[seg.mood];
 
     const div = document.createElement('div');
     div.className = 'result-seg fadein';
@@ -1344,9 +1590,9 @@ async function goToResults() {
           <div style="display:flex; align-items:baseline; gap:6px;">
             <span class="rseg-bpm" style="color:${moodColor};">${bpm}</span>
             <span class="rseg-bpm-unit">BPM</span>
-            <span class="rseg-mood-badge badge-${seg.mood}">${MOOD_LABELS[seg.mood]}</span>
+            <span class="rseg-mood-badge badge-${seg.mood}">${moodLabel}</span>
           </div>
-          <div class="rseg-pace">${formatPace(seg.pm, seg.ps)} min/${unit} · ${seg.dist} ${unit} · ${segMins} min</div>
+          <div class="rseg-pace">${infoLine}</div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:11px; color:var(--muted);" id="seg-coverage-${i}">0/${segMins}m</span>
@@ -1363,22 +1609,29 @@ async function goToResults() {
   }
 }
 
-function initPlaylistPanel() {
+let activeSegs = []; // shared reference used by renderPlaylistPanel
+
+function initPlaylistPanel(segs) {
+  activeSegs = segs;
   const container = document.getElementById('playlist-segments');
   container.innerHTML = '';
-  segments.forEach((seg, i) => {
-    const bpm = calcBPM(seg.pm, seg.ps);
+  segs.forEach((seg, i) => {
+    const bpm = seg._gym ? seg._bpm : calcBPM(seg.pm, seg.ps);
     const moodColor = MOOD_COLOR[seg.mood];
+    const label = seg._gym
+      ? `${GYM_ACTIVITIES[seg.activity].emoji} ${GYM_ACTIVITIES[seg.activity].label}`
+      : MOOD_LABELS[seg.mood];
+    const segSecs = seg._gym ? seg._durationSec : (seg.pm * 60 + seg.ps) * seg.dist;
     const block = document.createElement('div');
     block.className = 'playlist-seg-block';
     block.id = `pseg-${i}`;
     block.innerHTML = `
       <div class="playlist-seg-label">
         <div class="playlist-seg-dot" style="background:${moodColor};"></div>
-        <span class="playlist-seg-name" style="color:${moodColor};">${MOOD_LABELS[seg.mood]}</span>
+        <span class="playlist-seg-name" style="color:${moodColor};">${label}</span>
         <span class="playlist-seg-bpm">${bpm} BPM</span>
       </div>
-      <div class="playlist-seg-coverage" id="pcov-${i}">0 / ${Math.round((seg.pm*60+seg.ps)*seg.dist/60)} min</div>
+      <div class="playlist-seg-coverage" id="pcov-${i}">0 / ${Math.round(segSecs/60)} min</div>
       <div id="ptracks-${i}">
         <div class="playlist-empty-seg">No songs yet</div>
       </div>
@@ -1390,12 +1643,13 @@ function initPlaylistPanel() {
 }
 
 function renderPlaylistPanel() {
-  const totalWorkoutSecs = totalDurationSec();
+  const totalWorkoutSecs = activeSegs.reduce((s, seg) =>
+    s + (seg._gym ? seg._durationSec : (seg.pm * 60 + seg.ps) * seg.dist), 0);
   let totalSelectedSecs = 0;
   let totalTracks = 0;
 
-  segments.forEach((seg, i) => {
-    const segWorkoutSecs = (seg.pm * 60 + seg.ps) * seg.dist;
+  activeSegs.forEach((seg, i) => {
+    const segWorkoutSecs = seg._gym ? seg._durationSec : (seg.pm * 60 + seg.ps) * seg.dist;
     const selected = selectedTracks[i] || [];
     const selectedSecs = selected.reduce((s, t) => s + t.durationSec, 0);
     totalSelectedSecs += Math.min(selectedSecs, segWorkoutSecs);
@@ -1440,8 +1694,8 @@ function renderPlaylistPanel() {
   });
 
   // Update timeline fills
-  segments.forEach((seg, i) => {
-    const segWorkoutSecs = (seg.pm * 60 + seg.ps) * seg.dist;
+  activeSegs.forEach((seg, i) => {
+    const segWorkoutSecs = seg._gym ? seg._durationSec : (seg.pm * 60 + seg.ps) * seg.dist;
     const selected = selectedTracks[i] || [];
     const selectedSecs = selected.reduce((s, t) => s + t.durationSec, 0);
     const fillPct = Math.min(100, (selectedSecs / segWorkoutSecs) * 100);
@@ -1490,14 +1744,14 @@ function removeFromPlaylist(segIdx, trackIdx) {
   }
 }
 
-function buildTimeline(totalSecs) {
+function buildTimeline(totalSecs, segs) {
   const bar = document.getElementById('timeline-bar');
   const labels = document.getElementById('timeline-labels');
   bar.innerHTML = '';
   labels.innerHTML = '';
 
-  segments.forEach((seg, i) => {
-    const segSecs = (seg.pm * 60 + seg.ps) * seg.dist;
+  segs.forEach((seg, i) => {
+    const segSecs = seg._gym ? seg._durationSec : (seg.pm * 60 + seg.ps) * seg.dist;
     const pct = (segSecs / totalSecs * 100).toFixed(2);
     const color = MOOD_COLOR[seg.mood];
 
