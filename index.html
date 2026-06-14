@@ -1556,7 +1556,7 @@ async function queueInSpotify() {
     const devices = await spotifyGet('https://api.spotify.com/v1/me/player/devices');
     console.log('[FlowBeat] Spotify devices:', JSON.stringify(devices?.devices?.map(d => ({name:d.name, type:d.type, active:d.is_active}))));
     if (!devices?.devices?.length) {
-      toast('No Spotify devices found — open Spotify on any device first', 3500);
+      toast('Play any song in Spotify first, then queue here', 3500);
       btn.disabled = false;
       btn.innerHTML = SPOTIFY_BTN_LABEL;
       return;
@@ -1596,7 +1596,7 @@ async function queueInSpotify() {
   } else if (queued > 0) {
     toast(`${queued} queued, ${failed} failed`);
   } else {
-    toast('Could not queue — open Spotify on a device first', 3500);
+    toast('Play any song in Spotify first, then queue here', 3500);
   }
 }
 
