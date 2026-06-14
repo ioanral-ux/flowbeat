@@ -1542,6 +1542,7 @@ function toggleTrack(segIdx, trackIdx, uri, durationMs, name, artist, img, bpm, 
 }
 
 async function queueInSpotify() {
+  const SPOTIFY_BTN_LABEL = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg> Queue in Spotify`;
   const allSelected = Object.values(selectedTracks).flat();
   if (!allSelected.length) { toast('Select some songs first'); return; }
 
@@ -1549,18 +1550,19 @@ async function queueInSpotify() {
   btn.disabled = true;
   btn.textContent = 'Queuing…';
 
-  // Check there's an active Spotify device
+  // Log available devices for debugging but don't block on is_active —
+  // a paused/idle device still accepts queue calls
   try {
     const devices = await spotifyGet('https://api.spotify.com/v1/me/player/devices');
-    const active = devices?.devices?.find(d => d.is_active);
-    if (!active) {
-      toast('Open Spotify on any device first, then try again', 3500);
+    console.log('[FlowBeat] Spotify devices:', JSON.stringify(devices?.devices?.map(d => ({name:d.name, type:d.type, active:d.is_active}))));
+    if (!devices?.devices?.length) {
+      toast('No Spotify devices found — open Spotify on any device first', 3500);
       btn.disabled = false;
-      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg> Queue in Spotify`;
+      btn.innerHTML = SPOTIFY_BTN_LABEL;
       return;
     }
   } catch(e) {
-    // Non-fatal — proceed anyway, queue call will fail with a clear error if needed
+    console.warn('[FlowBeat] Could not fetch devices, proceeding anyway:', e);
   }
 
   // Queue each track in order with a small delay to avoid rate limiting
@@ -1587,7 +1589,7 @@ async function queueInSpotify() {
   }
 
   btn.disabled = false;
-  btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.622.622 0 01-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.622.622 0 11-.277-1.215c3.809-.87 7.077-.496 9.712 1.115a.623.623 0 01.207.857zm1.223-2.722a.779.779 0 01-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.778.778 0 11-.453-1.489c3.633-1.105 8.147-.569 11.233 1.327a.779.779 0 01.257 1.071zm.105-2.835C14.692 9.15 9.375 8.977 6.297 9.92a.935.935 0 11-.543-1.79c3.532-1.072 9.404-.865 13.115 1.338a.935.935 0 01-.955 1.6z"/></svg> Queue in Spotify`;
+  btn.innerHTML = SPOTIFY_BTN_LABEL;
 
   if (queued > 0 && failed === 0) {
     toast(`✓ ${queued} songs queued in Spotify`);
