@@ -865,8 +865,22 @@ select.mood-cooldown { border-left: 3px solid var(--mood-cooldown); }
 .gym-intensity-pill.active-mid  { border-color: var(--mood-steady); color: var(--mood-steady); background: color-mix(in srgb, var(--mood-steady) 12%, transparent); }
 .gym-intensity-pill.active-high { border-color: var(--mood-peak);   color: var(--mood-peak);   background: color-mix(in srgb, var(--mood-peak)   12%, transparent); }
 .gym-duration-hint { font-size: 10px; color: var(--muted2); margin-top: 4px; }
-.gym-del { align-self: center; background: none; border: none; color: var(--muted2); cursor: pointer; font-size: 18px; padding: 4px; line-height: 1; }
-.gym-del:hover { color: var(--mood-peak); }
+.reroll-btn {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.15s, border-color 0.15s, transform 0.15s;
+  line-height: 1.4;
+}
+.reroll-btn:hover { opacity: 1; border-color: var(--accent); transform: rotate(20deg) scale(1.1); }
+.reroll-btn:active { transform: rotate(180deg) scale(0.95); }
+.reroll-btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+
 
 </style>
 </head>
@@ -1596,6 +1610,7 @@ async function goToResults() {
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:11px; color:var(--muted);" id="seg-coverage-${i}">0/${segMins}m</span>
+          <button class="reroll-btn" id="reroll-${i}" onclick="event.stopPropagation(); rerollSeg(${i})" title="Get different songs" aria-label="Reroll songs">🎲</button>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="arrow-${i}" style="color:var(--muted); flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
         </div>
       </div>
@@ -1892,39 +1907,58 @@ async function spotifyGet(url) {
   return r.json();
 }
 
-async function fetchTracksForSeg(i, seg, bpm) {
+async function fetchTracksForSeg(i, seg, bpm, reroll = false) {
   const lbar = document.getElementById(`lbar-${i}`);
   const tlist = document.getElementById(`track-list-${i}`);
+
+  // Show reroll state
+  if (reroll) {
+    tlist.innerHTML = `<div class="seg-loading"><span class="spinner"></span> Finding different songs…</div>`;
+    lbar.style.width = '0%';
+    // Remove this segment's tracks from the global seen set so dedup doesn't block new results
+    const oldTracks = (tlist._shownIds || []);
+    oldTracks.forEach(id => seenTrackIds.delete(id));
+    tlist._shownIds = [];
+  }
 
   try {
     // ── Step 1: Build 3 varied queries for this segment ──────────────
     lbar.style.width = '20%';
 
+    // Expanded keyword pool — reroll rotates through them
     const moodKeywords = {
-      warmup:   ['chill easy warm',      'morning feel good',    'light groove easy'],
-      steady:   ['workout beat',         'groove dance',         'hip hop beat'],
-      push:     ['energy power drive',   'workout pump',         'high energy'],
-      peak:     ['intense hype fire',    'peak power anthem',    'max energy pump'],
-      cooldown: ['calm relax cool',      'chill slow easy',      'smooth groove']
+      warmup:   ['chill easy warm', 'morning feel good', 'light groove easy', 'acoustic mellow', 'soft indie warm', 'easy listening flow'],
+      steady:   ['workout beat', 'groove dance', 'hip hop beat', 'rhythm funk', 'mid tempo groove', 'upbeat pop run'],
+      push:     ['energy power drive', 'workout pump', 'high energy', 'rock driving fast', 'adrenaline boost', 'power anthem fast'],
+      peak:     ['intense hype fire', 'peak power anthem', 'max energy pump', 'hard fast loud', 'aggressive workout', 'rage fuel bass'],
+      cooldown: ['calm relax cool', 'chill slow easy', 'smooth groove', 'ambient downtempo', 'mellow jazz cool', 'soft peaceful end']
     };
-    const moods = moodKeywords[seg.mood] || ['workout', 'groove beat', 'dance'];
-    const genre1 = selectedGenres[0] || 'workout';
-    const genre2 = selectedGenres[1] || selectedGenres[0] || 'pop';
+    const allMoods = moodKeywords[seg.mood] || ['workout', 'groove beat', 'dance', 'upbeat', 'rhythm', 'tempo'];
 
-    // Half-BPM: a 90 BPM song at double-time feels like 180 BPM
+    // Rotate genre and keyword picks based on reroll count
+    const roll = reroll ? (Math.floor(Math.random() * 4) + 1) : 0;
+    const genres = [...selectedGenres, ...(selectedGenres.length < 2 ? ['pop', 'electronic'] : [])];
+    const genre1 = genres[roll % genres.length] || 'workout';
+    const genre2 = genres[(roll + 1) % genres.length] || 'pop';
+    const m0 = allMoods[(roll * 2)     % allMoods.length];
+    const m1 = allMoods[(roll * 2 + 1) % allMoods.length];
+    const m2 = allMoods[(roll * 2 + 2) % allMoods.length];
+
     const halfBpm = Math.round(bpm / 2);
+    // Use a Spotify search offset on reroll to get a different results page
+    const spotifyOffset = reroll ? (roll * 10) : 0;
 
     const queries = [
-      `${genre1} ${moods[0]}`,               // primary: genre + mood variant 1
-      `${genre2} ${moods[1]}`,               // secondary: genre2 + mood variant 2
-      `${genre1} ${moods[2]} bpm ${halfBpm}` // half-BPM angle with genre
+      `${genre1} ${m0}`,
+      `${genre2} ${m1}`,
+      `${genre1} ${m2} bpm ${halfBpm}`
     ];
 
     // ── Step 2: Fire all 3 searches in parallel ───────────────────────
     lbar.style.width = '35%';
     const searchResults = await Promise.all(
       queries.map(q =>
-        spotifyGet(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`)
+        spotifyGet(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10&offset=${spotifyOffset}`)
           .catch(() => null)
       )
     );
@@ -2077,6 +2111,7 @@ async function fetchTracksForSeg(i, seg, bpm) {
     // ── Step 6: Register shown tracks so other segments skip them ────
     const tracks = matched.map(({ track, bpm: tb }) => ({ ...track, tempo: tb }));
     tracks.forEach(t => { collectedTracks.push(t); seenTrackIds.add(t.id); });
+    tlist._shownIds = tracks.map(t => t.id); // remember for reroll cleanup
     renderTracks(tlist, tracks, bpm, i);
 
   } catch (e) {
@@ -2123,6 +2158,26 @@ function renderTracks(container, tracks, bpm, segIdx) {
     `;
   }).join('');
   container.innerHTML = rows;
+}
+
+function rerollSeg(i) {
+  const btn = document.getElementById(`reroll-${i}`);
+  if (btn) { btn.disabled = true; btn.style.transform = 'rotate(360deg)'; }
+
+  const seg = activeSegs[i];
+  const bpm = seg._gym ? seg._bpm : calcBPM(seg.pm, seg.ps);
+
+  // Make sure the segment body is open
+  const body = document.getElementById(`body-${i}`);
+  if (body && body.style.display === 'none') {
+    body.style.display = '';
+    const arrow = document.getElementById(`arrow-${i}`);
+    if (arrow) arrow.style.transform = '';
+  }
+
+  fetchTracksForSeg(i, seg, bpm, true).finally(() => {
+    if (btn) { btn.disabled = false; btn.style.transform = ''; }
+  });
 }
 
 function toggleSeg(i) {
